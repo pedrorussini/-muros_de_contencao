@@ -612,12 +612,12 @@ function calcStability(act, wts, p, passive, seismic = false) {
   const Fqd = 1 + 2 * Math.tan(phi2r) * (1 - Math.sin(phi2r)) ** 2 * (p.D / B_eff);
   const Fgd = 1;
 
-  // Inclination factors
-  const psi_deg = toDeg(Math.atan(Ph / Math.max(W, 0.01)));
-  const phi2_safe = Math.max(p.phi2, 0.01);
-  const Fqi = Math.max(0, (1 - psi_deg / phi2_safe) ** 2);
+  // Inclination factors (Hansen 1970 — razão de forças, igual ao site de referência)
+  const denom_incl = Math.max(W + B_eff * p.c2 / (Math.tan(phi2r) + 0.001), 0.001);
+  const term_i = Math.max(0, 1 - Ph / denom_incl);
+  const Fqi = term_i ** 2;
   const Fci = Math.max(0, Fqi - (1 - Fqi) / (Nc_val * Math.tan(phi2r) + 0.01));
-  const Fgi = Math.max(0, (1 - psi_deg / phi2_safe) ** 3);
+  const Fgi = term_i ** 3;
 
   const qu = p.c2 * Nc_val * Fcd * Fci +
              p.gamma2 * p.D * Nq_val * Fqd * Fqi +
