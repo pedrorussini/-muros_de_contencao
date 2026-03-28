@@ -177,13 +177,13 @@
       </div>
       <div class="sec-body">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-          <div><label>H₂ — Altura da cortina (m)</label><input class="inp" id="H2" type="number" step="0.1" value="3.0"></div>
-          <div><label>B — Largura da base (m)</label><input class="inp" id="B" type="number" step="0.1" value="2.4"></div>
-          <div><label>D — Prof. de embutimento (m)</label><input class="inp" id="D" type="number" step="0.05" value="0.50"></div>
-          <div><label>tf — Espessura fundação (m)</label><input class="inp" id="tf" type="number" step="0.05" value="0.40"></div>
-          <div><label>t1 — Esp. base da cortina (m)</label><input class="inp" id="t1" type="number" step="0.05" value="0.35"></div>
-          <div><label>t2 — Esp. topo da cortina (m)</label><input class="inp" id="t2" type="number" step="0.05" value="0.25"></div>
-          <div><label>t3 — Projeção frontal (m)</label><input class="inp" id="t3" type="number" step="0.05" value="0.50"></div>
+          <div><label>H₂ — Altura da cortina (m)</label><input class="inp" id="H2" type="number" step="0.1" value="6.0"></div>
+          <div><label>B — Largura da base (m)</label><input class="inp" id="B" type="number" step="0.1" value="4.0"></div>
+          <div><label>D — Prof. de embutimento (m)</label><input class="inp" id="D" type="number" step="0.05" value="1.50"></div>
+          <div><label>tf — Espessura fundação (m)</label><input class="inp" id="tf" type="number" step="0.05" value="0.70"></div>
+          <div><label>t1 — Esp. base da cortina (m)</label><input class="inp" id="t1" type="number" step="0.05" value="0.70"></div>
+          <div><label>t2 — Esp. topo da cortina (m)</label><input class="inp" id="t2" type="number" step="0.05" value="0.50"></div>
+          <div><label>t3 — Projeção frontal (m)</label><input class="inp" id="t3" type="number" step="0.05" value="0.70"></div>
         </div>
         <div style="margin-top:.5rem;" id="t4-display" class="notice notice-info">Calcanhar: calculado automaticamente</div>
       </div>
@@ -200,8 +200,8 @@
           <div><label>γ₁ — Peso esp. (kN/m³)</label><input class="inp" id="gamma1" type="number" step="0.5" value="18.0"></div>
           <div><label>φ₁ — Ângulo de atrito (°)</label><input class="inp" id="phi1" type="number" step="0.5" value="30.0"></div>
           <div><label>c₁ — Coesão (kPa)</label><input class="inp" id="c1" type="number" step="0.5" value="0.0"></div>
-          <div><label>α — Inclinação aterro (°)</label><input class="inp" id="alpha" type="number" step="0.5" value="0.0"></div>
-          <div><label>q — Sobrecarga (kPa)</label><input class="inp" id="q_sur" type="number" step="1" value="0.0"></div>
+          <div><label>α — Inclinação aterro (°)</label><input class="inp" id="alpha" type="number" step="0.5" value="10.0"></div>
+          <div><label>q — Sobrecarga (kPa)</label><input class="inp" id="q_sur" type="number" step="1" value="10.0"></div>
           <div><label>δ — Atrito muro-solo (°)</label><input class="inp" id="delta_ws" type="number" step="0.5" value="20.0"></div>
         </div>
       </div>
@@ -215,9 +215,9 @@
       </div>
       <div class="sec-body">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-          <div><label>γ₂ — Peso esp. (kN/m³)</label><input class="inp" id="gamma2" type="number" step="0.5" value="18.0"></div>
-          <div><label>φ₂ — Ângulo de atrito (°)</label><input class="inp" id="phi2" type="number" step="0.5" value="28.0"></div>
-          <div><label>c₂ — Coesão (kPa)</label><input class="inp" id="c2" type="number" step="0.5" value="10.0"></div>
+          <div><label>γ₂ — Peso esp. (kN/m³)</label><input class="inp" id="gamma2" type="number" step="0.5" value="19.0"></div>
+          <div><label>φ₂ — Ângulo de atrito (°)</label><input class="inp" id="phi2" type="number" step="0.5" value="20.0"></div>
+          <div><label>c₂ — Coesão (kPa)</label><input class="inp" id="c2" type="number" step="0.5" value="40.0"></div>
         </div>
       </div>
     </div>
@@ -232,7 +232,7 @@
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
           <div><label>f'c — Resist. concreto (MPa)</label><input class="inp" id="fc" type="number" step="1" value="21"></div>
           <div><label>fy — Escoamento aço (MPa)</label><input class="inp" id="fy" type="number" step="10" value="420"></div>
-          <div><label>γc — Peso concreto (kN/m³)</label><input class="inp" id="gammac" type="number" step="0.5" value="24.0"></div>
+          <div><label>γc — Peso concreto (kN/m³)</label><input class="inp" id="gammac" type="number" step="0.01" value="23.58"></div>
           <div><label>Cobrimento (m)</label><input class="inp" id="cover" type="number" step="0.005" value="0.075"></div>
         </div>
       </div>
@@ -246,7 +246,7 @@
       </div>
       <div class="sec-body">
         <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-          <div><label>Kh — Coef. horizontal</label><input class="inp" id="Kh" type="number" step="0.01" value="0.0"></div>
+          <div><label>Kh — Coef. horizontal</label><input class="inp" id="Kh" type="number" step="0.01" value="0.15"></div>
           <div><label>Kv — Coef. vertical</label><input class="inp" id="Kv" type="number" step="0.01" value="0.0"></div>
         </div>
         <div style="margin-top:.5rem;" class="notice notice-info">Kh = 0 → apenas análise estática</div>
@@ -457,13 +457,13 @@ function getParams() {
 
 function loadDefaults() {
   const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
-  set('H2',3.0); set('B',2.4); set('D',0.50); set('tf',0.40);
-  set('t1',0.35); set('t2',0.25); set('t3',0.50);
+  set('H2',6.0); set('B',4.0); set('D',1.50); set('tf',0.70);
+  set('t1',0.70); set('t2',0.50); set('t3',0.70);
   set('gamma1',18.0); set('phi1',30.0); set('c1',0.0);
-  set('alpha',0.0); set('q_sur',0.0); set('delta_ws',20.0);
-  set('gamma2',18.0); set('phi2',28.0); set('c2',10.0);
-  set('fc',21); set('fy',420); set('gammac',24.0); set('cover',0.075);
-  set('Kh',0.0); set('Kv',0.0);
+  set('alpha',10.0); set('q_sur',10.0); set('delta_ws',20.0);
+  set('gamma2',19.0); set('phi2',20.0); set('c2',40.0);
+  set('fc',21); set('fy',420); set('gammac',23.58); set('cover',0.075);
+  set('Kh',0.15); set('Kv',0.0);
 }
 
 // ============================================================
@@ -612,12 +612,11 @@ function calcStability(act, wts, p, passive, seismic = false) {
   const Fqd = 1 + 2 * Math.tan(phi2r) * (1 - Math.sin(phi2r)) ** 2 * (p.D / B_eff);
   const Fgd = 1;
 
-  // Inclination factors (Hansen 1970 — razão de forças, igual ao site de referência)
-  const denom_incl = Math.max(W + B_eff * p.c2 / (Math.tan(phi2r) + 0.001), 0.001);
-  const term_i = Math.max(0, 1 - Ph / denom_incl);
-  const Fqi = term_i ** 2;
-  const Fci = Math.max(0, Fqi - (1 - Fqi) / (Nc_val * Math.tan(phi2r) + 0.01));
-  const Fgi = term_i ** 3;
+  // Inclination factors (Meyerhof — ângulo ψ entre resultante e vertical)
+  const psi_deg = toDeg(Math.atan2(Ph, W));
+  const Fci = Math.max(0, (1 - psi_deg / 90) ** 2);
+  const Fqi = Math.max(0, (1 - psi_deg / 90) ** 2);
+  const Fgi = Math.max(0, (1 - psi_deg / Math.max(p.phi2, 0.01)) ** 2);
 
   const qu = p.c2 * Nc_val * Fcd * Fci +
              p.gamma2 * p.D * Nq_val * Fqd * Fqi +
@@ -944,7 +943,9 @@ function generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, st
   add('Nγ', `Nγ = 2(Nq+1)·tanφ₂`, fmt2(stab_C.Ng_val));
   add('Fator de profundidade Fcd', `Fcd = 1 + 0.4·(D/B\')`, fmt2(stab_C.Fcd));
   add('Fator de profundidade Fqd', `Fqd = 1 + 2tanφ₂(1−sinφ₂)²·(D/B\')`, fmt2(stab_C.Fqd));
-  add('Fator de inclinação Fci', `Fci (baseado em ψ = arctan(Ph/W))`, fmt2(stab_C.Fci));
+  add('Ângulo de inclinação ψ', `ψ = arctan(Ph/W) = arctan(${fmt2(stab_C.Ph)}/${fmt2(stab_C.W)})`, fmt2(toDeg(Math.atan2(stab_C.Ph, stab_C.W))) + '°');
+  add('Fator de inclinação Fci = Fqi', `(1 − ψ/90°)²`, fmt4(stab_C.Fci));
+  add('Fator de inclinação Fγi', `(1 − ψ/φ₂)²`, fmt4(stab_C.Fgi));
   add('Capacidade última', `qu = c₂·Nc·Fcd·Fci + γ₂·D·Nq·Fqd·Fqi + 0.5·γ₂·B\'·Nγ·Fgd·Fgi`, fmt2(stab_C.qu), 'kPa');
   add('FS Capacidade de Carga', `FS_cc = qu / q_máx = ${fmt2(stab_C.qu)} / ${fmt2(stab_C.q_toe)}`, fmt2(stab_C.FS_cap) + (stab_C.cap_ok ? ' ✓' : ' ✗'));
 
