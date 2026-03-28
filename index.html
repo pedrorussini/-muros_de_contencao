@@ -1,0 +1,1641 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Calculadora de Muros de Contenção</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: { 500: '#3b82f6', 600: '#2563eb' }
+          }
+        }
+      }
+    }
+  </script>
+  <style>
+    :root { --sidebar-w: 340px; }
+    * { box-sizing: border-box; }
+    html { scroll-behavior: smooth; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background:#0f172a; color:#e2e8f0; }
+
+    /* Scrollbars */
+    ::-webkit-scrollbar { width:6px; height:6px; }
+    ::-webkit-scrollbar-track { background:#1e293b; }
+    ::-webkit-scrollbar-thumb { background:#475569; border-radius:3px; }
+
+    /* Input fields */
+    .inp {
+      width:100%; padding:0.35rem 0.5rem; border-radius:0.375rem;
+      background:#1e293b; border:1px solid #334155; color:#e2e8f0;
+      font-size:0.85rem; transition: border-color .15s;
+    }
+    .inp:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,.3); }
+    label { font-size:0.78rem; color:#94a3b8; display:block; margin-bottom:2px; }
+
+    /* Tabs */
+    .tab-btn { padding:.45rem 1rem; border-radius:.375rem; font-size:.82rem; font-weight:500;
+               color:#94a3b8; transition:all .15s; cursor:pointer; white-space:nowrap; }
+    .tab-btn:hover { color:#e2e8f0; background:#1e293b; }
+    .tab-btn.active { background:#3b82f6; color:#fff; }
+    .tab-pane { display:none; }
+    .tab-pane.active { display:block; }
+
+    /* Cards */
+    .card { background:#1e293b; border:1px solid #334155; border-radius:.625rem; padding:1rem; }
+    .card-title { font-size:.8rem; font-weight:600; color:#94a3b8; text-transform:uppercase;
+                  letter-spacing:.05em; margin-bottom:.75rem; }
+
+    /* Table */
+    .res-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .res-table th { background:#0f172a; color:#94a3b8; font-weight:600; padding:.4rem .6rem;
+                    text-align:left; border-bottom:1px solid #334155; }
+    .res-table td { padding:.35rem .6rem; border-bottom:1px solid #1e293b; }
+    .res-table tr:last-child td { border-bottom:none; }
+    .res-table tr:hover td { background:rgba(59,130,246,.05); }
+
+    /* Status badges */
+    .ok { color:#22c55e; font-weight:700; }
+    .nok { color:#ef4444; font-weight:700; }
+    .warn { color:#f59e0b; font-weight:700; }
+
+    /* Section header inside panel */
+    .sec-hdr {
+      display:flex; align-items:center; justify-content:space-between;
+      padding:.5rem .75rem; background:#0f172a; border-radius:.375rem;
+      cursor:pointer; margin-bottom:.5rem; border:1px solid #334155;
+      user-select:none;
+    }
+    .sec-hdr:hover { border-color:#475569; }
+    .sec-hdr span { font-size:.8rem; font-weight:600; color:#cbd5e1; }
+    .sec-body { padding:.25rem 0 .5rem 0; }
+
+    /* Sidebar layout */
+    #sidebar {
+      width: var(--sidebar-w); min-width: var(--sidebar-w);
+      background:#0f172a; border-right:1px solid #1e293b;
+      height:calc(100vh - 56px); overflow-y:auto; position:sticky; top:56px;
+      padding:1rem;
+    }
+    #main-area {
+      flex:1; overflow-y:auto; height:calc(100vh - 56px);
+      padding:1rem; position:relative;
+    }
+
+    /* Header */
+    #topbar { height:56px; background:#0f172a; border-bottom:1px solid #1e293b;
+               display:flex; align-items:center; padding:0 1.25rem;
+               position:sticky; top:0; z-index:100; gap:1rem; }
+
+    /* Canvas */
+    canvas.techcanvas { background:#0f172a; border-radius:.5rem; display:block; max-width:100%; }
+
+    /* Memorial */
+    .mem-section { margin-bottom:1.5rem; }
+    .mem-section-title { font-size:.85rem; font-weight:700; color:#60a5fa; margin-bottom:.75rem;
+                         border-bottom:1px solid #1e293b; padding-bottom:.4rem; }
+    .mem-step { font-size:.8rem; margin-bottom:.5rem; padding:.5rem .75rem;
+                background:#0f172a; border-radius:.375rem; border-left:3px solid #334155; }
+    .mem-step .formula { color:#f1f5f9; font-family:monospace; font-size:.78rem; }
+    .mem-step .result { color:#22c55e; font-weight:600; margin-top:.2rem; font-size:.8rem; }
+    .mem-step .label { color:#94a3b8; font-size:.75rem; margin-bottom:.25rem; }
+
+    /* Responsive */
+    @media (max-width:900px) {
+      :root { --sidebar-w:100%; }
+      #layout { flex-direction:column; }
+      #sidebar { height:auto; position:relative; top:0; }
+      #main-area { height:auto; }
+    }
+
+    /* Print / PDF */
+    @media print {
+      #topbar, #sidebar { display:none !important; }
+      #main-area { height:auto; overflow:visible; }
+    }
+
+    /* Spinner */
+    .spinner { display:inline-block; width:16px; height:16px;
+               border:2px solid rgba(255,255,255,.3); border-top-color:#fff;
+               border-radius:50%; animation:spin .6s linear infinite; }
+    @keyframes spin { to { transform:rotate(360deg); } }
+
+    /* Notice */
+    .notice { padding:.75rem 1rem; border-radius:.5rem; font-size:.82rem; }
+    .notice-info { background:rgba(59,130,246,.15); border:1px solid rgba(59,130,246,.3); color:#93c5fd; }
+    .notice-warn { background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); color:#fcd34d; }
+  </style>
+</head>
+<body>
+
+<!-- ===== TOP BAR ===== -->
+<header id="topbar">
+  <div style="display:flex;align-items:center;gap:.75rem;flex:1;">
+    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
+      <rect x="1" y="1" width="26" height="26" rx="5" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
+      <rect x="5" y="8" width="6" height="15" rx="1" fill="#3b82f6"/>
+      <rect x="5" y="20" width="18" height="3" rx="1" fill="#60a5fa"/>
+      <path d="M11 11 L22 11 L22 20 L11 20" stroke="#94a3b8" stroke-width="1.2" fill="none" stroke-dasharray="2 1"/>
+    </svg>
+    <div>
+      <div style="font-weight:700;font-size:.95rem;line-height:1;">Muros de Contenção</div>
+      <div style="font-size:.68rem;color:#64748b;">Análise Geotécnica &amp; Estrutural · ACI 318 / Rankine / Coulomb</div>
+    </div>
+  </div>
+  <button onclick="loadDefaults()" class="tab-btn" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;">
+    Carregar Padrões
+  </button>
+  <button onclick="runCalculate()" id="btn-calc"
+    style="background:#3b82f6;color:#fff;padding:.4rem 1.1rem;border-radius:.375rem;font-size:.82rem;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;gap:.5rem;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+    Calcular
+  </button>
+  <button onclick="exportPDF()" id="btn-pdf"
+    style="background:#0f172a;color:#94a3b8;padding:.4rem 1rem;border-radius:.375rem;font-size:.82rem;font-weight:500;border:1px solid #334155;cursor:pointer;display:flex;align-items:center;gap:.5rem;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+    PDF
+  </button>
+</header>
+
+<!-- ===== MAIN LAYOUT ===== -->
+<div id="layout" style="display:flex;">
+
+  <!-- ===== SIDEBAR: INPUTS ===== -->
+  <aside id="sidebar">
+
+    <!-- GEOMETRIA -->
+    <div class="card" style="margin-bottom:.75rem;">
+      <div class="sec-hdr" onclick="toggleSec(this)">
+        <span>📐 Geometria do Muro</span>
+        <svg id="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sec-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+          <div><label>H₂ — Altura da cortina (m)</label><input class="inp" id="H2" type="number" step="0.1" value="3.0"></div>
+          <div><label>B — Largura da base (m)</label><input class="inp" id="B" type="number" step="0.1" value="2.4"></div>
+          <div><label>D — Prof. de embutimento (m)</label><input class="inp" id="D" type="number" step="0.05" value="0.50"></div>
+          <div><label>tf — Espessura fundação (m)</label><input class="inp" id="tf" type="number" step="0.05" value="0.40"></div>
+          <div><label>t1 — Esp. base da cortina (m)</label><input class="inp" id="t1" type="number" step="0.05" value="0.35"></div>
+          <div><label>t2 — Esp. topo da cortina (m)</label><input class="inp" id="t2" type="number" step="0.05" value="0.25"></div>
+          <div><label>t3 — Projeção frontal (m)</label><input class="inp" id="t3" type="number" step="0.05" value="0.50"></div>
+        </div>
+        <div style="margin-top:.5rem;" id="t4-display" class="notice notice-info">Calcanhar: calculado automaticamente</div>
+      </div>
+    </div>
+
+    <!-- SOLO ATERRO -->
+    <div class="card" style="margin-bottom:.75rem;">
+      <div class="sec-hdr" onclick="toggleSec(this)">
+        <span>🏔️ Solo de Aterro</span>
+        <svg id="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sec-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+          <div><label>γ₁ — Peso esp. (kN/m³)</label><input class="inp" id="gamma1" type="number" step="0.5" value="18.0"></div>
+          <div><label>φ₁ — Ângulo de atrito (°)</label><input class="inp" id="phi1" type="number" step="0.5" value="30.0"></div>
+          <div><label>c₁ — Coesão (kPa)</label><input class="inp" id="c1" type="number" step="0.5" value="0.0"></div>
+          <div><label>α — Inclinação aterro (°)</label><input class="inp" id="alpha" type="number" step="0.5" value="0.0"></div>
+          <div><label>q — Sobrecarga (kPa)</label><input class="inp" id="q_sur" type="number" step="1" value="0.0"></div>
+          <div><label>δ — Atrito muro-solo (°)</label><input class="inp" id="delta_ws" type="number" step="0.5" value="20.0"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SOLO FUNDAÇÃO -->
+    <div class="card" style="margin-bottom:.75rem;">
+      <div class="sec-hdr" onclick="toggleSec(this)">
+        <span>🪨 Solo de Fundação</span>
+        <svg id="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sec-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+          <div><label>γ₂ — Peso esp. (kN/m³)</label><input class="inp" id="gamma2" type="number" step="0.5" value="18.0"></div>
+          <div><label>φ₂ — Ângulo de atrito (°)</label><input class="inp" id="phi2" type="number" step="0.5" value="28.0"></div>
+          <div><label>c₂ — Coesão (kPa)</label><input class="inp" id="c2" type="number" step="0.5" value="10.0"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- MATERIAIS -->
+    <div class="card" style="margin-bottom:.75rem;">
+      <div class="sec-hdr" onclick="toggleSec(this)">
+        <span>🏗️ Materiais</span>
+        <svg id="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sec-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+          <div><label>f'c — Resist. concreto (MPa)</label><input class="inp" id="fc" type="number" step="1" value="21"></div>
+          <div><label>fy — Escoamento aço (MPa)</label><input class="inp" id="fy" type="number" step="10" value="420"></div>
+          <div><label>γc — Peso concreto (kN/m³)</label><input class="inp" id="gammac" type="number" step="0.5" value="24.0"></div>
+          <div><label>Cobrimento (m)</label><input class="inp" id="cover" type="number" step="0.005" value="0.075"></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- SÍSMICO -->
+    <div class="card" style="margin-bottom:.75rem;">
+      <div class="sec-hdr" onclick="toggleSec(this)">
+        <span>🌍 Parâmetros Sísmicos</span>
+        <svg id="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+      </div>
+      <div class="sec-body">
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
+          <div><label>Kh — Coef. horizontal</label><input class="inp" id="Kh" type="number" step="0.01" value="0.0"></div>
+          <div><label>Kv — Coef. vertical</label><input class="inp" id="Kv" type="number" step="0.01" value="0.0"></div>
+        </div>
+        <div style="margin-top:.5rem;" class="notice notice-info">Kh = 0 → apenas análise estática</div>
+      </div>
+    </div>
+
+    <button onclick="runCalculate()"
+      style="width:100%;background:#3b82f6;color:#fff;padding:.6rem;border-radius:.5rem;font-size:.9rem;font-weight:700;border:none;cursor:pointer;margin-top:.25rem;">
+      CALCULAR
+    </button>
+  </aside>
+
+  <!-- ===== MAIN CONTENT ===== -->
+  <main id="main-area">
+
+    <!-- Welcome / no-calc state -->
+    <div id="welcome-state">
+      <div style="max-width:560px;margin:3rem auto;text-align:center;">
+        <div style="font-size:3rem;margin-bottom:1rem;">🧱</div>
+        <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:.75rem;">Calculadora de Muros de Contenção</h2>
+        <p style="color:#64748b;font-size:.9rem;margin-bottom:1.5rem;">
+          Preencha os parâmetros no painel à esquerda e clique <strong>Calcular</strong> para obter
+          a análise completa (Rankine · Coulomb · Mononobe-Okabe · ACI 318 · FEM).
+        </p>
+        <button onclick="loadDefaults();runCalculate();"
+          style="background:#3b82f6;color:#fff;padding:.6rem 1.5rem;border-radius:.5rem;font-weight:700;border:none;cursor:pointer;font-size:.9rem;">
+          Executar com Valores Padrão
+        </button>
+      </div>
+    </div>
+
+    <!-- Results (hidden until calc) -->
+    <div id="results-state" style="display:none;">
+
+      <!-- Tabs -->
+      <div style="display:flex;gap:.35rem;margin-bottom:1rem;flex-wrap:wrap;overflow-x:auto;padding-bottom:.25rem;">
+        <button class="tab-btn active" data-tab="tab-geo">Análise Geotécnica</button>
+        <button class="tab-btn" data-tab="tab-struct">Análise Estrutural</button>
+        <button class="tab-btn" data-tab="tab-fem">Análise FEM</button>
+        <button class="tab-btn" data-tab="tab-vis">Visualização</button>
+        <button class="tab-btn" data-tab="tab-mem">Memorial de Cálculo</button>
+      </div>
+
+      <!-- ===== TAB: GEOTÉCNICA ===== -->
+      <div id="tab-geo" class="tab-pane active">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:1rem;margin-bottom:1rem;">
+          <!-- Coeficientes -->
+          <div class="card">
+            <div class="card-title">Coeficientes de Empuxo</div>
+            <table class="res-table">
+              <thead><tr><th>Parâmetro</th><th>Rankine</th><th>Coulomb</th><th>M-O (Sísm.)</th></tr></thead>
+              <tbody id="tbl-ka"></tbody>
+            </table>
+          </div>
+          <!-- Summary badges -->
+          <div class="card">
+            <div class="card-title">Resumo de Estabilidade</div>
+            <div id="stability-badges" style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;"></div>
+          </div>
+        </div>
+
+        <!-- Detailed results: Rankine vs Coulomb -->
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;">
+          <div class="card">
+            <div class="card-title">Rankine — Verificações Estáticas</div>
+            <div id="tbl-rankine"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Coulomb — Verificações Estáticas</div>
+            <div id="tbl-coulomb"></div>
+          </div>
+          <div class="card" id="card-seismic" style="display:none;">
+            <div class="card-title">Mononobe-Okabe — Verificações Sísmicas</div>
+            <div id="tbl-seismic"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- ===== TAB: ESTRUTURAL ===== -->
+      <div id="tab-struct" class="tab-pane">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;">
+          <div class="card">
+            <div class="card-title">Cortina (Muro Vertical)</div>
+            <div id="tbl-stem"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Fundação — Ponta (Toe)</div>
+            <div id="tbl-toe"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Fundação — Calcanhar (Heel)</div>
+            <div id="tbl-heel"></div>
+          </div>
+        </div>
+        <div class="card" style="margin-top:1rem;">
+          <div class="card-title">Resumo de Armaduras</div>
+          <table class="res-table">
+            <thead><tr><th>Seção</th><th>Mu (kN·m/m)</th><th>d (m)</th><th>As req. (cm²/m)</th><th>As mín. (cm²/m)</th><th>As adot. (cm²/m)</th><th>Status</th></tr></thead>
+            <tbody id="tbl-struct-summary"></tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- ===== TAB: FEM ===== -->
+      <div id="tab-fem" class="tab-pane">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-bottom:1rem;">
+          <div class="card">
+            <div class="card-title">Resultados FEM — Deslocamentos</div>
+            <div id="tbl-fem-disp"></div>
+          </div>
+          <div class="card">
+            <div class="card-title">Resultados FEM — Esforços</div>
+            <div id="tbl-fem-forces"></div>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Malha Deformada (escala amplificada)</div>
+          <canvas id="canvas-fem" class="techcanvas" width="700" height="400"></canvas>
+        </div>
+      </div>
+
+      <!-- ===== TAB: VISUALIZAÇÃO ===== -->
+      <div id="tab-vis" class="tab-pane">
+        <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:1rem;margin-bottom:1rem;">
+          <div class="card">
+            <div class="card-title">Diagrama de Pressões Horizontais</div>
+            <canvas id="chart-pressure" height="280"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-title">Diagrama de Força Cortante</div>
+            <canvas id="chart-shear" height="280"></canvas>
+          </div>
+          <div class="card">
+            <div class="card-title">Diagrama de Momento Fletor</div>
+            <canvas id="chart-moment" height="280"></canvas>
+          </div>
+        </div>
+        <div class="card">
+          <div class="card-title">Seção Transversal do Muro</div>
+          <canvas id="canvas-wall" class="techcanvas" width="700" height="450"></canvas>
+        </div>
+      </div>
+
+      <!-- ===== TAB: MEMORIAL ===== -->
+      <div id="tab-mem" class="tab-pane">
+        <div class="card" style="margin-bottom:1rem;">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
+            <div class="card-title" style="margin-bottom:0;">Memorial de Cálculo Detalhado</div>
+            <button onclick="exportPDF()"
+              style="background:#3b82f6;color:#fff;padding:.35rem .9rem;border-radius:.375rem;font-size:.78rem;font-weight:600;border:none;cursor:pointer;">
+              Exportar PDF
+            </button>
+          </div>
+          <div id="memorial-content"></div>
+        </div>
+      </div>
+
+    </div><!-- end results-state -->
+  </main>
+</div>
+
+<!-- ===== PDF PRINT AREA (hidden) ===== -->
+<div id="pdf-area" style="display:none;background:#fff;color:#000;padding:2rem;font-family:'Segoe UI',sans-serif;font-size:11pt;">
+  <div id="pdf-content"></div>
+</div>
+
+<script>
+// ============================================================
+// UTILITY FUNCTIONS
+// ============================================================
+const toRad = d => d * Math.PI / 180;
+const toDeg = r => r * 180 / Math.PI;
+const fmt = (v, d=3) => isFinite(v) && !isNaN(v) ? (+v).toFixed(d) : (v === Infinity ? '∞' : 'N/D');
+const fmt2 = v => fmt(v, 2);
+const fmt4 = v => fmt(v, 4);
+
+function toggleSec(hdr) {
+  const body = hdr.nextElementSibling;
+  const arr  = hdr.querySelector('svg');
+  if (body.style.display === 'none') {
+    body.style.display = '';
+    arr.style.transform = '';
+  } else {
+    body.style.display = 'none';
+    arr.style.transform = 'rotate(-90deg)';
+  }
+}
+
+function getParams() {
+  const g = id => parseFloat(document.getElementById(id).value) || 0;
+  const H2     = g('H2');
+  const B      = g('B');
+  const D      = g('D');
+  const tf     = g('tf');
+  const t1     = g('t1');
+  const t2     = g('t2');
+  const t3     = g('t3');
+  const t4     = Math.max(0.05, B - t3 - t1);
+  return {
+    H2, B, D, tf, t1, t2, t3, t4,
+    gamma1: g('gamma1'), phi1: g('phi1'), c1: g('c1'),
+    alpha: g('alpha'), q: g('q_sur'), delta_ws: g('delta_ws'),
+    gamma2: g('gamma2'), phi2: g('phi2'), c2: g('c2'),
+    fc: g('fc'), fy: g('fy'), gammac: g('gammac'), cover: g('cover'),
+    Kh: g('Kh'), Kv: g('Kv')
+  };
+}
+
+function loadDefaults() {
+  const set = (id, v) => { const el = document.getElementById(id); if(el) el.value = v; };
+  set('H2',3.0); set('B',2.4); set('D',0.50); set('tf',0.40);
+  set('t1',0.35); set('t2',0.25); set('t3',0.50);
+  set('gamma1',18.0); set('phi1',30.0); set('c1',0.0);
+  set('alpha',0.0); set('q_sur',0.0); set('delta_ws',20.0);
+  set('gamma2',18.0); set('phi2',28.0); set('c2',10.0);
+  set('fc',21); set('fy',420); set('gammac',24.0); set('cover',0.075);
+  set('Kh',0.0); set('Kv',0.0);
+}
+
+// ============================================================
+// GEOTECHNICAL CALCULATIONS
+// ============================================================
+
+function calcKaRankine(phi1, alpha) {
+  const phi1r  = toRad(phi1);
+  const alpha_r = toRad(alpha);
+  const cosA = Math.cos(alpha_r);
+  const cosP = Math.cos(phi1r);
+  if (cosA * cosA <= cosP * cosP) return 1.0;
+  const sq = Math.sqrt(cosA * cosA - cosP * cosP);
+  return cosA * (cosA - sq) / (cosA + sq);
+}
+
+function calcKaCoulomb(phi1, alpha, delta_ws) {
+  // beta = 90° (vertical wall), delta = user-defined
+  const phi1r  = toRad(phi1);
+  const alpha_r = toRad(alpha);
+  const delta_r = toRad(delta_ws);
+  const beta_r  = toRad(90);
+  const sin_bpf = Math.sin(beta_r + phi1r);
+  const sinB    = Math.sin(beta_r);
+  const sin_bmd = Math.sin(beta_r - delta_r);
+  const sin_fpd = Math.sin(phi1r + delta_r);
+  const sin_fma = Math.sin(phi1r - alpha_r);
+  const sin_apb = Math.sin(alpha_r + beta_r);
+  if (sin_bmd <= 0) return calcKaRankine(phi1, alpha);
+  const sqarg = (sin_fpd * sin_fma) / (sin_bmd * sin_apb);
+  if (sqarg < 0) return calcKaRankine(phi1, alpha);
+  return (sin_bpf ** 2) / (sinB ** 2 * sin_bmd * (1 + Math.sqrt(sqarg)) ** 2);
+}
+
+function calcKaeMononobe(phi1, alpha, delta_ws, Kh, Kv) {
+  if (Kh <= 0) return null;
+  const phi1r  = toRad(phi1);
+  const alpha_r = toRad(alpha);
+  const delta_r = toRad(delta_ws);
+  const theta_r = Math.atan(Kh / Math.max(1 - Kv, 0.01));
+  const bv = 0; // vertical wall (0° from vertical = 90° from horizontal)
+  const f_t_b = phi1r - theta_r - bv;
+  const num  = Math.cos(f_t_b) ** 2;
+  const d1   = Math.cos(theta_r) * Math.cos(bv) ** 2 * Math.cos(delta_r + bv + theta_r);
+  const sn   = Math.sin(phi1r + delta_r) * Math.sin(phi1r - theta_r - alpha_r);
+  const sd   = Math.cos(delta_r + bv + theta_r) * Math.cos(alpha_r - bv);
+  if (d1 <= 0 || sd <= 0 || sn < 0) return calcKaCoulomb(phi1, alpha, delta_ws) * 1.3;
+  return num / (d1 * (1 + Math.sqrt(sn / sd)) ** 2);
+}
+
+function calcActiveForce(Ka, gamma1, q, Hp) {
+  // σ(z) = Ka*(q + gamma1*z), z from top
+  const Ph_rect = Ka * q * Hp;
+  const Ph_tri  = 0.5 * Ka * gamma1 * Hp ** 2;
+  const Ph      = Ph_rect + Ph_tri;
+  const arm_rect = Hp / 2;
+  const arm_tri  = Hp / 3;
+  const Mh = Ph_rect * arm_rect + Ph_tri * arm_tri; // moment about base
+  return { Ph, Mh, Ph_rect, Ph_tri, arm_rect, arm_tri };
+}
+
+function calcPassive(phi2, c2, gamma2, D) {
+  const Kp = Math.tan(toRad(45 + phi2/2)) ** 2;
+  const Pp = 0.5 * Kp * gamma2 * D ** 2 + 2 * c2 * Math.sqrt(Kp) * D;
+  return { Kp, Pp };
+}
+
+function calcWeights(p) {
+  const { H2, B, D, tf, t1, t2, t3, t4, gamma1, gamma2, gammac, q } = p;
+  // Stem (tapered, per unit width)
+  const A_stem = (t1 + t2) / 2 * H2;
+  const W_stem = gammac * A_stem;
+  const x_stem = t3 + t1 / 2; // centroid from toe (simplified)
+
+  // Footing
+  const W_foot = gammac * B * tf;
+  const x_foot = B / 2;
+
+  // Soil on heel (above footing)
+  const W_heel = gamma1 * t4 * H2;
+  const x_heel = t3 + t1 + t4 / 2;
+
+  // Soil above toe cap (in front) — usually 0 for toe region
+  const W_toe_soil = gamma2 * t3 * D;
+  const x_toe_soil = t3 / 2;
+
+  // Surcharge on heel
+  const W_q = q * t4;
+  const x_q = x_heel;
+
+  const W_total = W_stem + W_foot + W_heel + W_toe_soil + W_q;
+  const Mr = W_stem * x_stem + W_foot * x_foot + W_heel * x_heel +
+             W_toe_soil * x_toe_soil + W_q * x_q;
+
+  return { W_stem, x_stem, W_foot, x_foot, W_heel, x_heel,
+           W_toe_soil, x_toe_soil, W_q, x_q, W_total, Mr };
+}
+
+function calcStability(act, wts, p, passive, seismic = false) {
+  const { W_total, Mr, W_stem, W_foot } = wts;
+  const { Kp, Pp } = passive;
+  const phi2r = toRad(p.phi2);
+  let { Ph, Mh } = act;
+  let W = W_total;
+  let M_res = Mr;
+  let F_vert_seis = 0;
+
+  if (seismic && p.Kh > 0) {
+    // Vertical seismic on weights
+    const Wmod = W_total * (1 - p.Kv);
+    const dW = W_total - Wmod;
+    W = Wmod;
+    M_res = Mr * (1 - p.Kv);
+    // Inertia on concrete (horizontal)
+    const F_inert = (W_stem + W_foot) * p.Kh;
+    const arm_inert = p.tf + p.H2 / 2;
+    Ph += F_inert;
+    Mh += F_inert * arm_inert;
+  }
+
+  // Overturning
+  const FS_vol = Mh > 0 ? M_res / Mh : Infinity;
+
+  // Eccentricity
+  const e = p.B / 2 - (M_res - Mh) / W;
+  const e_lim = seismic ? p.B / 4 : p.B / 6;
+  const e_ok  = Math.abs(e) <= e_lim;
+  const B_eff = Math.max(0.1, p.B - 2 * Math.abs(e));
+
+  // Pressures at base
+  const q_toe  = (W / p.B) * (1 + 6 * e / p.B);
+  const q_heel = (W / p.B) * (1 - 6 * e / p.B);
+  const q_max  = Math.max(q_toe, q_heel, 0);
+
+  // Sliding
+  const friction = W * Math.tan((2/3) * phi2r) + (2/3) * p.c2 * p.B;
+  const FS_desl  = Ph > 0 ? (friction + Pp) / Ph : Infinity;
+
+  // Bearing capacity (Meyerhof formulation)
+  const Nq_val = Math.tan(toRad(45 + p.phi2 / 2)) ** 2 * Math.exp(Math.PI * Math.tan(phi2r));
+  const Nc_val = p.phi2 > 0.01 ? (Nq_val - 1) / Math.tan(phi2r) : 5.14;
+  const Ng_val = 2 * (Nq_val + 1) * Math.tan(phi2r);
+
+  // Depth factors
+  const Fcd = 1 + 0.4 * p.D / B_eff;
+  const Fqd = 1 + 2 * Math.tan(phi2r) * (1 - Math.sin(phi2r)) ** 2 * (p.D / B_eff);
+  const Fgd = 1;
+
+  // Inclination factors
+  const psi_deg = toDeg(Math.atan(Ph / Math.max(W, 0.01)));
+  const phi2_safe = Math.max(p.phi2, 0.01);
+  const Fqi = Math.max(0, (1 - psi_deg / phi2_safe) ** 2);
+  const Fci = Math.max(0, Fqi - (1 - Fqi) / (Nc_val * Math.tan(phi2r) + 0.01));
+  const Fgi = Math.max(0, (1 - psi_deg / phi2_safe) ** 3);
+
+  const qu = p.c2 * Nc_val * Fcd * Fci +
+             p.gamma2 * p.D * Nq_val * Fqd * Fqi +
+             0.5 * p.gamma2 * B_eff * Ng_val * Fgd * Fgi;
+
+  const FS_cap = q_max > 0 ? qu / q_max : Infinity;
+
+  const lim_vol  = seismic ? 1.2 : 1.5;
+  const lim_desl = seismic ? 1.25 : 1.5;
+  const lim_cap  = seismic ? 2.0 : 3.0;
+
+  return {
+    Ph, Mh, W, M_res,
+    FS_vol, FS_desl, FS_cap,
+    lim_vol, lim_desl, lim_cap,
+    vol_ok: FS_vol >= lim_vol, desl_ok: FS_desl >= lim_desl, cap_ok: FS_cap >= lim_cap,
+    e, e_ok, e_lim, B_eff, q_toe, q_heel, qu,
+    Nc_val, Nq_val, Ng_val, Fcd, Fqd, Fci, Fqi, Fgd, Fgi, Kp, Pp, friction
+  };
+}
+
+// ============================================================
+// STRUCTURAL DESIGN (ACI 318)
+// ============================================================
+
+function selectBar(As_cm2) {
+  // Returns [bar_name, bar_area_cm2_per_m, spacing_cm]
+  const bars = [
+    { d:'#3 (3/8")', a:0.71 }, { d:'#4 (1/2")', a:1.29 },
+    { d:'#5 (5/8")', a:2.00 }, { d:'#6 (3/4")', a:2.84 },
+    { d:'#7 (7/8")', a:3.87 }, { d:'#8 (1")',   a:5.10 }
+  ];
+  for (const b of bars) {
+    const sp = Math.floor(b.a / (As_cm2 / 100) * 100) / 100; // spacing m
+    if (sp <= 0.30 && sp >= 0.05) {
+      const sp_cm = Math.floor(sp * 100);
+      return { desc: `${b.d} c/${sp_cm}cm`, As: (b.a / sp) * 100 };
+    }
+  }
+  // Default: #8 bars at min spacing
+  return { desc: '#8 (1") c/5cm', As: 5.10 / 0.05 };
+}
+
+function calcStructural(p, stab_C, act_C) {
+  const { H2, tf, t1, t2, t3, t4, B, fc, fy, cover, gamma1, q, gammac, gamma2 } = p;
+  const phi_flex = 0.9;
+  const fc_kpa   = fc * 1000; // kPa
+  const fy_kpa   = fy * 1000; // kPa
+  const b = 1.0; // per unit width (m)
+
+  function designSection(Mu_kNm, thick) {
+    const d = Math.max(0.05, thick - cover - 0.008); // effective depth
+    const Mu = Math.abs(Mu_kNm) * 1000; // N·m/m → use kN·m
+    const Rn = Mu / (phi_flex * b * d * d); // kN/m² = kPa
+    const ratio = 2 * Rn / (0.85 * fc_kpa);
+    let rho = (0.85 * fc_kpa / fy_kpa) * (1 - Math.sqrt(Math.max(0, 1 - ratio)));
+    const rho_min = Math.max(0.7 * Math.sqrt(fc_kpa) / fy_kpa, 1400 / fy_kpa);
+    const rho_max = 0.75 * 0.85 * 0.85 * fc_kpa / fy_kpa * 600 / (600 + fy);
+    rho = Math.max(rho, rho_min);
+    const As_m2 = rho * b * d;    // m²/m
+    const As_cm2 = As_m2 * 10000; // cm²/m
+    const As_min_cm2 = rho_min * b * d * 10000;
+    const As_adot = Math.max(As_cm2, As_min_cm2);
+    const bar = selectBar(As_adot);
+    return { Mu: Mu_kNm, d, rho, As_cm2, As_min_cm2, As_adot, bar, ok: rho <= rho_max };
+  }
+
+  const Ka = stab_C.Kp !== undefined ? null : null; // reuse act_C Ka
+  const Ka_val = act_C.Ph / (0.5 * gamma1 * (H2 + tf) ** 2 + q * (H2 + tf)) || 0.3;
+  const Hp = H2 + tf;
+
+  // === STEM BASE ===
+  // Moment at base of stem from active pressure over H2
+  const Ph_rect_s = Ka_val * q * H2;
+  const Ph_tri_s  = 0.5 * Ka_val * gamma1 * H2 ** 2;
+  const Ma_stem = Ph_rect_s * H2/2 + Ph_tri_s * H2/3;
+  const Mu_stem = 1.6 * Ma_stem;
+  const stem_base = designSection(Mu_stem, t1);
+
+  // === STEM MID ===
+  const H_mid = H2 / 2;
+  const Ph_rect_m = Ka_val * q * H_mid;
+  const Ph_tri_m  = 0.5 * Ka_val * gamma1 * H_mid ** 2;
+  const Ma_mid = Ph_rect_m * H_mid/2 + Ph_tri_m * H_mid/3;
+  const Mu_mid = 1.6 * Ma_mid;
+  const t_mid = (t1 + t2) / 2;
+  const stem_mid = designSection(Mu_mid, t_mid);
+
+  // === FOOTING — TOE (ponta) ===
+  // Upward soil pressure minus downward footing weight
+  // q_toe from stability results, q at face of stem = interpolate
+  const q_at_stem = stab_C.q_toe - (stab_C.q_toe - stab_C.q_heel) * t3 / B;
+  const q_avg_toe = (stab_C.q_toe + q_at_stem) / 2;
+  const w_foot_toe = gammac * tf;
+  const net_toe = q_avg_toe - w_foot_toe;
+  const Ma_toe = net_toe * t3 ** 2 / 2;
+  const Mu_toe = 1.6 * Math.abs(Ma_toe);
+  const toe_sec = designSection(Mu_toe, tf);
+
+  // === FOOTING — HEEL (calcanhar) ===
+  // Downward soil weight + footing weight minus upward soil pressure
+  const q_at_heel = stab_C.q_heel;
+  const q_at_stem_heel = q_at_stem;
+  const q_avg_heel = (q_at_heel + q_at_stem_heel) / 2;
+  const w_soil_heel = gamma1 * H2 + q + gammac * tf;
+  const net_heel = w_soil_heel - q_avg_heel;
+  const Ma_heel = Math.abs(net_heel) * t4 ** 2 / 2;
+  const Mu_heel = 1.6 * Ma_heel;
+  const heel_sec = designSection(Mu_heel, tf);
+
+  return { stem_base, stem_mid, toe_sec, heel_sec, Ka_val };
+}
+
+// ============================================================
+// FEM ANALYSIS (simplified beam on elastic foundation)
+// ============================================================
+function calcFEM(p, stab_C, act_C) {
+  const n = 10; // elements in stem
+  const H2 = p.H2;
+  const Le = H2 / n; // element length
+  const Ka = act_C.Ph / (0.5 * p.gamma1 * (H2 + p.tf) ** 2 + p.q * (H2 + p.tf)) || 0.3;
+
+  // Stiffness: EI for stem
+  const E = 4700 * Math.sqrt(p.fc) * 1000; // MPa → kPa  (Ec = 4700√f'c MPa)
+  const t_avg = (p.t1 + p.t2) / 2;
+  const I = (1 * t_avg ** 3) / 12; // per unit width m⁴/m
+  const EI = E * I;
+
+  // Build load vector: distributed lateral pressure
+  const nDOF = (n + 1) * 2; // 2 DOF per node: w (transverse) and θ (rotation)
+  const F = new Array(nDOF).fill(0);
+  const K_global = Array.from({length: nDOF}, () => new Array(nDOF).fill(0));
+
+  // Beam element stiffness matrix (local = global for vertical beam)
+  function kElem(EI, L) {
+    const k = [
+      [ 12*EI/L**3,   6*EI/L**2, -12*EI/L**3,   6*EI/L**2],
+      [  6*EI/L**2,   4*EI/L,    - 6*EI/L**2,   2*EI/L   ],
+      [-12*EI/L**3,  -6*EI/L**2,  12*EI/L**3,  -6*EI/L**2],
+      [  6*EI/L**2,   2*EI/L,    - 6*EI/L**2,   4*EI/L   ]
+    ];
+    return k;
+  }
+
+  // Assemble global stiffness
+  for (let e = 0; e < n; e++) {
+    const k = kElem(EI, Le);
+    const dofs = [e*2, e*2+1, (e+1)*2, (e+1)*2+1];
+    for (let i = 0; i < 4; i++)
+      for (let j = 0; j < 4; j++)
+        K_global[dofs[i]][dofs[j]] += k[i][j];
+  }
+
+  // Lateral pressure load (uniform for simplicity)
+  for (let e = 0; e < n; e++) {
+    const z_mid = (e + 0.5) * Le; // depth from top
+    const p_z = Ka * (p.q + p.gamma1 * z_mid); // kPa
+    const f_equiv = p_z * Le / 2; // equivalent nodal force (kN/m)
+    F[e*2]       += f_equiv;
+    F[(e+1)*2]   += f_equiv;
+    F[e*2+1]     += p_z * Le**2 / 12;
+    F[(e+1)*2+1] -= p_z * Le**2 / 12;
+  }
+
+  // Boundary conditions: fixed at base (DOF 2n and 2n+1 = 0)
+  const base_dof = n * 2;
+  const free_dofs = Array.from({length: nDOF}, (_, i) => i)
+                         .filter(i => i !== base_dof && i !== base_dof+1);
+  const nFree = free_dofs.length;
+  const K_free = free_dofs.map(i => free_dofs.map(j => K_global[i][j]));
+  const F_free = free_dofs.map(i => F[i]);
+
+  // Solve by Gaussian elimination
+  const U_free = gaussSolve(K_free, F_free);
+  const U = new Array(nDOF).fill(0);
+  free_dofs.forEach((dof, i) => U[dof] = U_free[i]);
+
+  // Max displacement at top
+  const u_top = U[0]; // horizontal displacement at top
+  const theta_top = U[1];
+
+  // Bending moments at each node
+  const moments = [];
+  for (let e = 0; e < n; e++) {
+    const dofs = [e*2, e*2+1, (e+1)*2, (e+1)*2+1];
+    const u_e  = dofs.map(d => U[d]);
+    const M_start = EI / Le * (6/Le * u_e[0] + 4 * u_e[1] - 6/Le * u_e[2] + 2 * u_e[3]);
+    const M_end   = EI / Le * (-6/Le * u_e[0] + 2 * u_e[1] + 6/Le * u_e[2] + 4 * u_e[3]);
+    moments.push(M_start);
+    if (e === n-1) moments.push(M_end);
+  }
+
+  return {
+    n, Le, EI, u_top, theta_top,
+    displacements: free_dofs.map((d, i) => ({ dof:d, u:U_free[i] })),
+    moments, U
+  };
+}
+
+function gaussSolve(A, b) {
+  const n = A.length;
+  const M = A.map((row, i) => [...row, b[i]]);
+  for (let col = 0; col < n; col++) {
+    let maxRow = col;
+    for (let row = col+1; row < n; row++)
+      if (Math.abs(M[row][col]) > Math.abs(M[maxRow][col])) maxRow = row;
+    [M[col], M[maxRow]] = [M[maxRow], M[col]];
+    for (let row = col+1; row < n; row++) {
+      const factor = M[row][col] / (M[col][col] || 1e-12);
+      for (let j = col; j <= n; j++) M[row][j] -= factor * M[col][j];
+    }
+  }
+  const x = new Array(n).fill(0);
+  for (let i = n-1; i >= 0; i--) {
+    x[i] = M[i][n];
+    for (let j = i+1; j < n; j++) x[i] -= M[i][j] * x[j];
+    x[i] /= (M[i][i] || 1e-12);
+  }
+  return x;
+}
+
+// ============================================================
+// PRESSURE PROFILE FOR CHARTS
+// ============================================================
+function calcPressureProfile(p, Ka_R, Ka_C, Ka_MO) {
+  const nPts = 20;
+  const Hp = p.H2 + p.tf;
+  const depths = Array.from({length:nPts+1}, (_,i) => i * Hp / nPts);
+  const press = {
+    depths,
+    rankine:  depths.map(z => Ka_R  * (p.q + p.gamma1 * z)),
+    coulomb:  depths.map(z => Ka_C  * (p.q + p.gamma1 * z)),
+    seismic:  Ka_MO ? depths.map(z => Ka_MO * (p.q + p.gamma1 * z)) : null,
+    shear:    depths.map(z => Ka_C * p.q * z + 0.5 * Ka_C * p.gamma1 * z**2),
+    moment:   depths.map(z => Ka_C * p.q * z**2 / 2 + Ka_C * p.gamma1 * z**3 / 6)
+  };
+  return press;
+}
+
+// ============================================================
+// MEMORIAL DE CÁLCULO
+// ============================================================
+function generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, stab_MO, struct) {
+  const Hp = p.H2 + p.tf;
+  const t4 = p.t4;
+  const steps = [];
+
+  const add = (label, formula, result, unit='') => steps.push({ label, formula, result, unit });
+
+  // --- Seção 1: Geometria ---
+  steps.push({ section: '1. Geometria e Dimensões' });
+  add('Altura da cortina', 'H₂', fmt(p.H2), 'm');
+  add('Largura da base', 'B', fmt(p.B), 'm');
+  add('Espessura da fundação', 'tf', fmt(p.tf), 'm');
+  add('Projeção frontal (ponta)', 't3', fmt(p.t3), 'm');
+  add('Calcanhar', `t4 = B − t3 − t1 = ${fmt(p.B)} − ${fmt(p.t3)} − ${fmt(p.t1)}`, fmt(t4), 'm');
+  add('Altura total de pressão', `Hp = H2 + tf = ${fmt(p.H2)} + ${fmt(p.tf)}`, fmt(Hp), 'm');
+
+  // --- Seção 2: Coeficientes de Empuxo ---
+  steps.push({ section: '2. Coeficientes de Empuxo Ativo' });
+
+  add('Ka (Rankine) — inclinação α='+fmt(p.alpha)+'°',
+    `Ka = cos(α) × [cos(α) − √(cos²α − cos²φ₁)] / [cos(α) + √(cos²α − cos²φ₁)]`,
+    fmt4(Ka_R));
+
+  add('Ka (Coulomb) — δ='+fmt(p.delta_ws)+'°',
+    `Ka = sin²(β+φ₁) / [sin²β · sin(β−δ) · (1 + √(sin(φ₁+δ)·sin(φ₁−α) / (sin(β−δ)·sin(α+β))))²]`,
+    fmt4(Ka_C));
+
+  if (Ka_MO !== null) {
+    add('Kae (Mononobe-Okabe)', `θ = arctan(Kh/(1−Kv)) = arctan(${p.Kh}/${1-p.Kv}) = ${fmt2(toDeg(Math.atan(p.Kh/Math.max(1-p.Kv,0.01))))}°`, fmt4(Ka_MO));
+  }
+
+  // --- Seção 3: Forças Ativas ---
+  steps.push({ section: '3. Forças de Empuxo Ativo (Coulomb)' });
+  add('Pressão retangular (sobrecarga)',
+    `Ph_rect = Ka · q · Hp = ${fmt4(Ka_C)} × ${fmt(p.q)} × ${fmt(Hp)}`, fmt2(act_C.Ph_rect), 'kN/m');
+  add('Pressão triangular (solo)',
+    `Ph_tri = ½ · Ka · γ₁ · Hp² = 0.5 × ${fmt4(Ka_C)} × ${fmt(p.gamma1)} × ${fmt(Hp)}²`, fmt2(act_C.Ph_tri), 'kN/m');
+  add('Força horizontal total',
+    `Ph = Ph_rect + Ph_tri = ${fmt2(act_C.Ph_rect)} + ${fmt2(act_C.Ph_tri)}`, fmt2(act_C.Ph), 'kN/m');
+  add('Momento de tombamento (em relação à base)',
+    `Mh = Ph_rect × Hp/2 + Ph_tri × Hp/3`, fmt2(act_C.Mh), 'kN·m/m');
+
+  // --- Seção 4: Pesos Componentes ---
+  steps.push({ section: '4. Pesos dos Componentes' });
+  const wts_label = [
+    ['Cortina (concreto)', `γc × ((t1+t2)/2) × H2 = ${p.gammac}×${fmt((p.t1+p.t2)/2)}×${fmt(p.H2)}`],
+    ['Fundação (concreto)', `γc × B × tf = ${p.gammac}×${fmt(p.B)}×${fmt(p.tf)}`],
+    ['Solo calcanhar', `γ₁ × t4 × H2 = ${p.gamma1}×${fmt(t4)}×${fmt(p.H2)}`],
+    ['Solo ponta', `γ₂ × t3 × D = ${p.gamma2}×${fmt(p.t3)}×${fmt(p.D)}`],
+    ['Sobrecarga calcanhar', `q × t4 = ${p.q}×${fmt(t4)}`],
+  ];
+  const wt_vals = [
+    p.gammac * (p.t1+p.t2)/2 * p.H2,
+    p.gammac * p.B * p.tf,
+    p.gamma1 * t4 * p.H2,
+    p.gamma2 * p.t3 * p.D,
+    p.q * t4
+  ];
+  wts_label.forEach(([lab, form], i) => add(lab, form, fmt2(wt_vals[i]), 'kN/m'));
+  add('Força vertical total', `ΣW = Σ componentes`, fmt2(stab_C.W), 'kN/m');
+  add('Momento resistente (em relação à ponta)', `ΣMr = Σ(Wi × xi)`, fmt2(stab_C.M_res), 'kN·m/m');
+
+  // --- Seção 5: Resistência Passiva ---
+  steps.push({ section: '5. Resistência Passiva (Rankine)' });
+  add('Kp', `Kp = tan²(45° + φ₂/2) = tan²(45° + ${p.phi2/2}°)`, fmt4(stab_C.Kp));
+  add('Empuxo passivo', `Pp = ½ · Kp · γ₂ · D² + 2c₂·√Kp·D`, fmt2(stab_C.Pp), 'kN/m');
+
+  // --- Seção 6: Estabilidade (Coulomb) ---
+  steps.push({ section: '6. Verificações de Estabilidade (Coulomb — Estático)' });
+  add('Excentricidade', `e = B/2 − (Mr − Mo) / W = ${fmt(p.B/2)} − (${fmt2(stab_C.M_res)} − ${fmt2(stab_C.Mh)}) / ${fmt2(stab_C.W)}`, fmt2(stab_C.e), 'm');
+  add('Limite excentricidade', `e_máx = B/6 = ${fmt(p.B)}/6`, fmt2(stab_C.e_lim), 'm');
+  add('Largura efetiva', `B\' = B − 2|e| = ${fmt(p.B)} − 2×${fmt2(Math.abs(stab_C.e))}`, fmt2(stab_C.B_eff), 'm');
+  add('Pressão máxima (ponta)', `q_máx = (W/B) × (1 + 6e/B)`, fmt2(stab_C.q_toe), 'kPa');
+  add('Pressão mínima (calcanhar)', `q_mín = (W/B) × (1 − 6e/B)`, fmt2(stab_C.q_heel), 'kPa');
+  add('FS Tombamento', `FS_volt = Mr / Mo = ${fmt2(stab_C.M_res)} / ${fmt2(stab_C.Mh)}`, fmt2(stab_C.FS_vol) + (stab_C.vol_ok ? ' ✓' : ' ✗'));
+  add('FS Deslizamento', `FS_desl = (ΣW·tan(2/3·φ₂) + 2/3·c₂·B + Pp) / Ph`, fmt2(stab_C.FS_desl) + (stab_C.desl_ok ? ' ✓' : ' ✗'));
+
+  // --- Seção 7: Capacidade de Carga ---
+  steps.push({ section: '7. Capacidade de Carga (Terzaghi-Meyerhof)' });
+  add('Nq', `Nq = tan²(45°+φ₂/2) · e^(π·tanφ₂)`, fmt2(stab_C.Nq_val));
+  add('Nc', `Nc = (Nq−1)/tanφ₂`, fmt2(stab_C.Nc_val));
+  add('Nγ', `Nγ = 2(Nq+1)·tanφ₂`, fmt2(stab_C.Ng_val));
+  add('Fator de profundidade Fcd', `Fcd = 1 + 0.4·(D/B\')`, fmt2(stab_C.Fcd));
+  add('Fator de profundidade Fqd', `Fqd = 1 + 2tanφ₂(1−sinφ₂)²·(D/B\')`, fmt2(stab_C.Fqd));
+  add('Fator de inclinação Fci', `Fci (baseado em ψ = arctan(Ph/W))`, fmt2(stab_C.Fci));
+  add('Capacidade última', `qu = c₂·Nc·Fcd·Fci + γ₂·D·Nq·Fqd·Fqi + 0.5·γ₂·B\'·Nγ·Fgd·Fgi`, fmt2(stab_C.qu), 'kPa');
+  add('FS Capacidade de Carga', `FS_cc = qu / q_máx = ${fmt2(stab_C.qu)} / ${fmt2(stab_C.q_toe)}`, fmt2(stab_C.FS_cap) + (stab_C.cap_ok ? ' ✓' : ' ✗'));
+
+  // --- Seção 8: Dimensionamento Estrutural ---
+  steps.push({ section: '8. Dimensionamento Estrutural (ACI 318)' });
+  const sects = [
+    ['Cortina — Base', struct.stem_base],
+    ['Cortina — Meio', struct.stem_mid],
+    ['Fundação — Ponta', struct.toe_sec],
+    ['Fundação — Calcanhar', struct.heel_sec]
+  ];
+  for (const [name, s] of sects) {
+    add(`${name} — Mu`, `Mu = 1.6 × Ma`, fmt2(s.Mu), 'kN·m/m');
+    add(`${name} — d efetivo`, `d = espessura − cobrimento − Ø/2`, fmt(s.d), 'm');
+    add(`${name} — As requerida`, `Rn → ρ → As = ρ·b·d`, fmt2(s.As_cm2), 'cm²/m');
+    add(`${name} — As mínima ACI`, `As_min = max(0.7√f\'c, 1.4)/fy × b·d`, fmt2(s.As_min_cm2), 'cm²/m');
+    add(`${name} — Armadura adotada`, `${s.bar.desc}`, fmt2(s.bar.As), 'cm²/m');
+  }
+
+  return steps;
+}
+
+// ============================================================
+// MAIN CALCULATE FUNCTION
+// ============================================================
+let lastResults = null;
+let charts = {};
+
+function runCalculate() {
+  const btn = document.getElementById('btn-calc');
+  btn.innerHTML = '<span class="spinner"></span> Calculando...';
+  btn.disabled = true;
+
+  setTimeout(() => {
+    try {
+      const p = getParams();
+
+      // Update t4 display
+      const t4 = Math.max(0.05, p.B - p.t3 - p.t1);
+      document.getElementById('t4-display').textContent = `Calcanhar (t4) = ${fmt2(t4)} m`;
+
+      const Ka_R  = calcKaRankine(p.phi1, p.alpha);
+      const Ka_C  = calcKaCoulomb(p.phi1, p.alpha, p.delta_ws);
+      const Ka_MO = calcKaeMononobe(p.phi1, p.alpha, p.delta_ws, p.Kh, p.Kv);
+
+      const Hp = p.H2 + p.tf;
+      const act_R  = calcActiveForce(Ka_R,  p.gamma1, p.q, Hp);
+      const act_C  = calcActiveForce(Ka_C,  p.gamma1, p.q, Hp);
+      const act_MO = Ka_MO ? calcActiveForce(Ka_MO, p.gamma1, p.q, Hp) : null;
+
+      const wts     = calcWeights(p);
+      const passive = calcPassive(p.phi2, p.c2, p.gamma2, p.D);
+
+      const stab_R  = calcStability(act_R, wts, p, passive, false);
+      const stab_C  = calcStability(act_C, wts, p, passive, false);
+      const stab_MO = act_MO ? calcStability(act_MO, wts, p, passive, true) : null;
+
+      const struct  = calcStructural(p, stab_C, act_C);
+      const fem     = calcFEM(p, stab_C, act_C);
+      const pressProfile = calcPressureProfile(p, Ka_R, Ka_C, Ka_MO);
+      const memorial = generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, stab_MO, struct);
+
+      lastResults = { p, Ka_R, Ka_C, Ka_MO, act_R, act_C, act_MO,
+                      stab_R, stab_C, stab_MO, struct, fem, pressProfile, memorial,
+                      wts, passive };
+
+      renderResults(lastResults);
+
+      document.getElementById('welcome-state').style.display = 'none';
+      document.getElementById('results-state').style.display = 'block';
+    } catch(e) {
+      console.error(e);
+      alert('Erro no cálculo: ' + e.message);
+    }
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg> Calcular`;
+    btn.disabled = false;
+  }, 50);
+}
+
+// ============================================================
+// RENDER RESULTS
+// ============================================================
+function statusBadge(ok, val, lim, unit='') {
+  const cl = ok ? 'ok' : 'nok';
+  const sym = ok ? '✓' : '✗';
+  return `<span class="${cl}">${fmt2(val)} ${sym}</span><small style="color:#64748b;"> ≥${lim}</small>`;
+}
+
+function renderStabilityTable(stab, el_id) {
+  const { FS_vol, FS_desl, FS_cap, vol_ok, desl_ok, cap_ok,
+          lim_vol, lim_desl, lim_cap, e, e_ok, B_eff, q_toe, q_heel, qu } = stab;
+  const html = `
+    <table class="res-table">
+      <thead><tr><th>Verificação</th><th>FS Calc.</th><th>FS Mín.</th><th>Status</th></tr></thead>
+      <tbody>
+        <tr><td>Tombamento</td><td>${fmt2(FS_vol)}</td><td>${lim_vol}</td><td class="${vol_ok?'ok':'nok'}">${vol_ok?'VERIFICA':'NÃO VERIFICA'}</td></tr>
+        <tr><td>Deslizamento</td><td>${fmt2(FS_desl)}</td><td>${lim_desl}</td><td class="${desl_ok?'ok':'nok'}">${desl_ok?'VERIFICA':'NÃO VERIFICA'}</td></tr>
+        <tr><td>Cap. de Carga</td><td>${fmt2(FS_cap)}</td><td>${lim_cap}</td><td class="${cap_ok?'ok':'nok'}">${cap_ok?'VERIFICA':'NÃO VERIFICA'}</td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:.75rem;font-size:.8rem;color:#94a3b8;display:grid;grid-template-columns:1fr 1fr;gap:.35rem;">
+      <div>e = <strong style="color:#e2e8f0;">${fmt2(e)} m</strong> ${e_ok?'<span class="ok">✓</span>':'<span class="nok">✗</span>'}</div>
+      <div>B\' = <strong style="color:#e2e8f0;">${fmt2(B_eff)} m</strong></div>
+      <div>q_ponta = <strong style="color:#e2e8f0;">${fmt2(q_toe)} kPa</strong></div>
+      <div>q_calc. = <strong style="color:#e2e8f0;">${fmt2(q_heel)} kPa</strong></div>
+      <div>qu = <strong style="color:#e2e8f0;">${fmt2(qu)} kPa</strong></div>
+    </div>
+  `;
+  document.getElementById(el_id).innerHTML = html;
+}
+
+function renderStructTable(sec, title, el_id) {
+  const html = `
+    <table class="res-table">
+      <thead><tr><th>Parâmetro</th><th>Valor</th></tr></thead>
+      <tbody>
+        <tr><td>Mu (kN·m/m)</td><td>${fmt2(sec.Mu)}</td></tr>
+        <tr><td>d efetivo (m)</td><td>${fmt(sec.d)}</td></tr>
+        <tr><td>As req. (cm²/m)</td><td>${fmt2(sec.As_cm2)}</td></tr>
+        <tr><td>As mín. (cm²/m)</td><td>${fmt2(sec.As_min_cm2)}</td></tr>
+        <tr><td>As adot. (cm²/m)</td><td><strong style="color:#60a5fa;">${fmt2(sec.As_adot)}</strong></td></tr>
+        <tr><td>Armadura</td><td><strong style="color:#60a5fa;">${sec.bar.desc}</strong></td></tr>
+        <tr><td>Status</td><td class="${sec.ok?'ok':'warn'}">${sec.ok?'OK':'Verificar ρ_max'}</td></tr>
+      </tbody>
+    </table>
+  `;
+  document.getElementById(el_id).innerHTML = html;
+}
+
+function renderResults(r) {
+  const { p, Ka_R, Ka_C, Ka_MO, stab_R, stab_C, stab_MO, struct, fem, pressProfile, memorial } = r;
+
+  // Ka table
+  document.getElementById('tbl-ka').innerHTML = `
+    <tr><td>Ka</td><td>${fmt4(Ka_R)}</td><td>${fmt4(Ka_C)}</td><td>${Ka_MO?fmt4(Ka_MO):'—'}</td></tr>
+    <tr><td>Ph (kN/m)</td><td>${fmt2(r.act_R.Ph)}</td><td>${fmt2(r.act_C.Ph)}</td><td>${r.act_MO?fmt2(r.act_MO.Ph):'—'}</td></tr>
+    <tr><td>Mh (kN·m/m)</td><td>${fmt2(r.act_R.Mh)}</td><td>${fmt2(r.act_C.Mh)}</td><td>${r.act_MO?fmt2(r.act_MO.Mh):'—'}</td></tr>
+  `;
+
+  // Stability badges
+  const allOk = stab_C.vol_ok && stab_C.desl_ok && stab_C.cap_ok;
+  const badges = [
+    ['Tombamento', stab_C.FS_vol, stab_C.lim_vol, stab_C.vol_ok],
+    ['Deslizamento', stab_C.FS_desl, stab_C.lim_desl, stab_C.desl_ok],
+    ['Cap. de Carga', stab_C.FS_cap, stab_C.lim_cap, stab_C.cap_ok],
+    ...(stab_MO ? [
+      ['Tomb. Sísmico', stab_MO.FS_vol, stab_MO.lim_vol, stab_MO.vol_ok],
+      ['Desl. Sísmico', stab_MO.FS_desl, stab_MO.lim_desl, stab_MO.desl_ok],
+      ['Cap. Sísmica', stab_MO.FS_cap, stab_MO.lim_cap, stab_MO.cap_ok],
+    ] : [])
+  ];
+  document.getElementById('stability-badges').innerHTML = badges.map(([name, val, lim, ok]) => `
+    <div style="background:#0f172a;border-radius:.5rem;padding:.6rem .75rem;border:1px solid ${ok?'#166534':'#7f1d1d'}">
+      <div style="font-size:.72rem;color:#94a3b8;margin-bottom:.2rem;">${name}</div>
+      <div style="font-size:1.1rem;font-weight:700;color:${ok?'#22c55e':'#ef4444'}">${fmt2(val)}</div>
+      <div style="font-size:.7rem;color:#64748b;">≥ ${lim}</div>
+    </div>
+  `).join('');
+
+  // Stability tables
+  renderStabilityTable(stab_R, 'tbl-rankine');
+  renderStabilityTable(stab_C, 'tbl-coulomb');
+  if (stab_MO) {
+    document.getElementById('card-seismic').style.display = '';
+    renderStabilityTable(stab_MO, 'tbl-seismic');
+  }
+
+  // Structural
+  renderStructTable(struct.stem_base, 'Cortina — Base', 'tbl-stem');
+  document.getElementById('tbl-stem').innerHTML +=
+    '<div class="card-title" style="margin-top:.75rem;">Cortina — Meio</div>' +
+    buildMiniStructTable(struct.stem_mid);
+  renderStructTable(struct.toe_sec, '', 'tbl-toe');
+  renderStructTable(struct.heel_sec, '', 'tbl-heel');
+
+  // Summary table
+  const rows = [
+    ['Cortina — Base', struct.stem_base],
+    ['Cortina — Meio', struct.stem_mid],
+    ['Fundação — Ponta', struct.toe_sec],
+    ['Fundação — Calcanhar', struct.heel_sec]
+  ];
+  document.getElementById('tbl-struct-summary').innerHTML = rows.map(([n,s]) =>
+    `<tr>
+      <td>${n}</td>
+      <td>${fmt2(s.Mu)}</td>
+      <td>${fmt(s.d)}</td>
+      <td>${fmt2(s.As_cm2)}</td>
+      <td>${fmt2(s.As_min_cm2)}</td>
+      <td><strong style="color:#60a5fa;">${fmt2(s.As_adot)}</strong></td>
+      <td class="${s.ok?'ok':'warn'}">${s.ok?'OK':'Verificar'}</td>
+    </tr>`
+  ).join('');
+
+  // FEM tables
+  document.getElementById('tbl-fem-disp').innerHTML = `
+    <table class="res-table">
+      <thead><tr><th>Parâmetro</th><th>Valor</th></tr></thead>
+      <tbody>
+        <tr><td>Deslocamento horizontal no topo</td><td>${(fem.u_top*1000).toFixed(2)} mm</td></tr>
+        <tr><td>Rotação no topo</td><td>${(fem.theta_top*1000).toFixed(3)} mrad</td></tr>
+        <tr><td>N° de elementos</td><td>${fem.n}</td></tr>
+        <tr><td>EI (kN·m²/m)</td><td>${fmt2(fem.EI)}</td></tr>
+      </tbody>
+    </table>`;
+
+  const M_max = Math.max(...fem.moments.map(Math.abs));
+  const M_base = Math.abs(fem.moments[fem.moments.length-1]);
+  document.getElementById('tbl-fem-forces').innerHTML = `
+    <table class="res-table">
+      <thead><tr><th>Parâmetro</th><th>Valor</th></tr></thead>
+      <tbody>
+        <tr><td>Momento máximo</td><td>${fmt2(M_max)} kN·m/m</td></tr>
+        <tr><td>Momento na base</td><td>${fmt2(M_base)} kN·m/m</td></tr>
+        <tr><td>Mola de fundação (approx.)</td><td>${fmt2(stab_C.qu / (p.tf))} kN/m²/m</td></tr>
+      </tbody>
+    </table>`;
+
+  // Charts
+  renderCharts(pressProfile, p);
+  drawWall(document.getElementById('canvas-wall'), p, r);
+  drawFEM(document.getElementById('canvas-fem'), p, fem);
+
+  // Memorial
+  renderMemorial(memorial);
+}
+
+function buildMiniStructTable(s) {
+  return `<table class="res-table">
+    <tbody>
+      <tr><td>Mu</td><td>${fmt2(s.Mu)} kN·m/m</td></tr>
+      <tr><td>As req.</td><td>${fmt2(s.As_cm2)} cm²/m</td></tr>
+      <tr><td>Armadura</td><td><strong style="color:#60a5fa;">${s.bar.desc}</strong></td></tr>
+    </tbody>
+  </table>`;
+}
+
+// ============================================================
+// CHARTS (Chart.js)
+// ============================================================
+function renderCharts(pp, p) {
+  const Hp = p.H2 + p.tf;
+  const depths = pp.depths;
+  // Reverse for display (top to bottom)
+  const labels = depths.map(d => fmt2(d) + ' m');
+
+  const mkChart = (id, datasets, xLabel) => {
+    if (charts[id]) charts[id].destroy();
+    const ctx = document.getElementById(id).getContext('2d');
+    charts[id] = new Chart(ctx, {
+      type: 'line',
+      data: { labels, datasets },
+      options: {
+        indexAxis: 'y',
+        responsive: true,
+        plugins: {
+          legend: { labels: { color:'#94a3b8', font: { size:11 } } }
+        },
+        scales: {
+          x: { title: { display:true, text:xLabel, color:'#64748b' },
+               ticks: { color:'#64748b' }, grid: { color:'#1e293b' } },
+          y: { title: { display:true, text:'Profundidade (m)', color:'#64748b' },
+               ticks: { color:'#64748b' }, grid: { color:'#1e293b' }, reverse:false }
+        }
+      }
+    });
+  };
+
+  const dsCommon = { fill: false, tension: 0.3, pointRadius: 2 };
+
+  // Pressure chart
+  const pressDs = [
+    { ...dsCommon, label:'Rankine', data:pp.rankine, borderColor:'#60a5fa', backgroundColor:'rgba(96,165,250,.15)', fill:true },
+    { ...dsCommon, label:'Coulomb', data:pp.coulomb, borderColor:'#34d399', backgroundColor:'rgba(52,211,153,.1)', fill:false },
+    ...(pp.seismic ? [{ ...dsCommon, label:'Mononobe-Okabe', data:pp.seismic, borderColor:'#f87171', fill:false }] : [])
+  ];
+  mkChart('chart-pressure', pressDs, 'Pressão (kPa)');
+
+  // Shear chart
+  const shearDs = [
+    { ...dsCommon, label:'Cortante V (kN/m)', data:pp.shear, borderColor:'#a78bfa', fill:true, backgroundColor:'rgba(167,139,250,.1)' }
+  ];
+  mkChart('chart-shear', shearDs, 'Cortante (kN/m)');
+
+  // Moment chart
+  const momentDs = [
+    { ...dsCommon, label:'Momento M (kN·m/m)', data:pp.moment, borderColor:'#fb923c', fill:true, backgroundColor:'rgba(251,146,60,.1)' }
+  ];
+  mkChart('chart-moment', momentDs, 'Momento (kN·m/m)');
+}
+
+// ============================================================
+// CANVAS: WALL DRAWING
+// ============================================================
+function drawWall(canvas, p, r) {
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width;
+  const CH = canvas.height;
+  ctx.clearRect(0, 0, CW, CH);
+
+  const { H2, B, D, tf, t1, t2, t3, t4 } = p;
+  const totalH = H2 + tf + D + 0.5;
+  const totalW = B + 2.5;
+
+  const scale = Math.min((CW * 0.65) / totalW, (CH * 0.8) / totalH);
+  const ox = CW * 0.22; // origin x (toe of footing bottom)
+  const oy = CH * 0.85; // origin y (bottom = surface level)
+
+  const cx = x => ox + x * scale;
+  const cy = y => oy - y * scale;
+
+  // ---- Ground surface
+  ctx.strokeStyle = '#475569';
+  ctx.setLineDash([5, 3]);
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(0, cy(D));
+  ctx.lineTo(CW, cy(D));
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // ---- Backfill hatch
+  ctx.fillStyle = 'rgba(120,90,50,0.18)';
+  const hx = cx(t3 + t1);
+  const hy = cy(tf + H2);
+  ctx.fillRect(hx, hy, t4 * scale, H2 * scale);
+  // diagonal lines
+  ctx.strokeStyle = 'rgba(120,90,50,0.35)';
+  ctx.lineWidth = 0.8;
+  for (let xx = hx; xx < hx + t4 * scale + 20; xx += 12) {
+    ctx.beginPath();
+    const x1 = Math.max(xx, hx);
+    const x2 = Math.min(xx + H2 * scale, hx + t4 * scale);
+    if (x2 > x1) {
+      ctx.moveTo(x1, cy(tf + H2));
+      ctx.lineTo(x2, cy(tf + H2) + (x2 - x1));
+      ctx.stroke();
+    }
+  }
+
+  // ---- Footing fill
+  ctx.fillStyle = '#334155';
+  ctx.beginPath();
+  ctx.rect(cx(0), cy(tf), B * scale, tf * scale);
+  ctx.fill();
+  ctx.strokeStyle = '#60a5fa';
+  ctx.lineWidth = 1.5;
+  ctx.strokeRect(cx(0), cy(tf), B * scale, tf * scale);
+
+  // ---- Stem fill (tapered)
+  ctx.fillStyle = '#334155';
+  ctx.beginPath();
+  ctx.moveTo(cx(t3),           cy(tf));
+  ctx.lineTo(cx(t3 + t1),      cy(tf));
+  ctx.lineTo(cx(t3 + t1 - (t1-t2)/2), cy(tf + H2));
+  ctx.lineTo(cx(t3 + (t1-t2)/2),      cy(tf + H2));
+  ctx.closePath();
+  ctx.fill();
+  ctx.strokeStyle = '#60a5fa';
+  ctx.lineWidth = 1.5;
+  ctx.stroke();
+
+  // ---- Embedment soil (in front, below ground)
+  ctx.fillStyle = 'rgba(100,116,139,0.25)';
+  ctx.fillRect(cx(-0.5), cy(D), (t3 + 0.5) * scale, D * scale);
+
+  // ---- Dimension lines
+  ctx.strokeStyle = '#64748b';
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = `${Math.max(9, scale*0.13)}px monospace`;
+  ctx.lineWidth = 0.8;
+
+  function dimH(x, y1, y2, label, side = 1) {
+    const xd = cx(x) + side * 18;
+    ctx.strokeStyle = '#475569';
+    ctx.beginPath(); ctx.moveTo(xd, cy(y1)); ctx.lineTo(xd, cy(y2)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx(x), cy(y1)); ctx.lineTo(xd, cy(y1)); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx(x), cy(y2)); ctx.lineTo(xd, cy(y2)); ctx.stroke();
+    ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = side > 0 ? 'left' : 'right';
+    ctx.fillText(label, xd + side * 4, cy((y1 + y2) / 2) + 4);
+  }
+
+  function dimW(x1, x2, y, label) {
+    const yd = cy(y) - 14;
+    ctx.strokeStyle = '#475569';
+    ctx.beginPath(); ctx.moveTo(cx(x1), yd); ctx.lineTo(cx(x2), yd); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx(x1), cy(y)); ctx.lineTo(cx(x1), yd); ctx.stroke();
+    ctx.beginPath(); ctx.moveTo(cx(x2), cy(y)); ctx.lineTo(cx(x2), yd); ctx.stroke();
+    ctx.fillStyle = '#94a3b8';
+    ctx.textAlign = 'center';
+    ctx.fillText(label, cx((x1 + x2) / 2), yd - 3);
+  }
+
+  dimH(B + 0.1, 0, tf,      `tf=${fmt(tf)}m`);
+  dimH(B + 0.1, tf, tf+H2,  `H2=${fmt(H2)}m`);
+  dimH(-0.8,    0, D,        `D=${fmt(D)}m`, -1);
+  dimW(0,  t3,     tf+H2+0.3, `t3=${fmt(t3)}m`);
+  dimW(t3, t3+t1,  tf+H2+0.3, `t1=${fmt(t1)}m`);
+  dimW(t3+t1, B,   tf+H2+0.3, `t4=${fmt2(t4)}m`);
+  dimW(0, B,       tf+H2+0.7, `B=${fmt(B)}m`);
+
+  // ---- Labels
+  ctx.fillStyle = '#cbd5e1';
+  ctx.font = `bold ${Math.max(10, scale*0.12)}px sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.fillText('MURO DE CONTENÇÃO', CW/2, 18);
+  ctx.font = `${Math.max(8, scale*0.1)}px sans-serif`;
+  ctx.fillStyle = '#64748b';
+  ctx.fillText('Seção Transversal — Escala Aproximada', CW/2, 32);
+
+  // ---- Pressure arrows (simplified)
+  const Ka = r.stab_C.Kp !== undefined ? r.Ka_C : 0.3;
+  const Hp = H2 + tf;
+  const maxP = Ka * p.gamma1 * Hp;
+  const maxArrow = Math.min(50, t3 * scale * 0.7);
+  ctx.strokeStyle = '#f87171';
+  ctx.fillStyle = '#f87171';
+  const nArr = 5;
+  for (let i = 0; i < nArr; i++) {
+    const zr = (i + 0.5) / nArr;
+    const z = zr * Hp;
+    const pz = Ka * (p.q + p.gamma1 * z);
+    const len = (pz / maxP) * maxArrow;
+    const yw = cy(Hp - z);
+    ctx.lineWidth = 1;
+    ctx.beginPath();
+    ctx.moveTo(cx(t3) - 2, yw);
+    ctx.lineTo(cx(t3) - 2 - len, yw);
+    ctx.stroke();
+    // arrowhead
+    ctx.beginPath();
+    ctx.moveTo(cx(t3) - 2, yw);
+    ctx.lineTo(cx(t3) - 2 - 6, yw - 3);
+    ctx.lineTo(cx(t3) - 2 - 6, yw + 3);
+    ctx.fill();
+  }
+  ctx.font = `${Math.max(8,9)}px sans-serif`;
+  ctx.fillStyle = '#f87171';
+  ctx.textAlign = 'right';
+  ctx.fillText('Empuxo', cx(t3) - maxArrow - 4, cy(Hp * 0.5));
+}
+
+// ============================================================
+// CANVAS: FEM DEFORMED MESH
+// ============================================================
+function drawFEM(canvas, p, fem) {
+  const ctx = canvas.getContext('2d');
+  const CW = canvas.width;
+  const CH = canvas.height;
+  ctx.clearRect(0, 0, CW, CH);
+
+  const n = fem.n;
+  const Le = fem.Le;
+  const H2 = p.H2;
+  const t_avg = (p.t1 + p.t2) / 2;
+
+  const scale = Math.min((CH * 0.75) / H2, (CW * 0.35) / t_avg);
+  const amp = 500; // amplification factor for displacements
+  const ox = CW * 0.38;
+  const oy = CH * 0.88;
+
+  const cx0 = x => ox + x * scale;
+  const cy0 = y => oy - y * scale;
+
+  // Original outline
+  ctx.strokeStyle = '#334155';
+  ctx.lineWidth = 1.5;
+  ctx.setLineDash([4, 3]);
+  ctx.beginPath();
+  ctx.moveTo(cx0(0), cy0(0));
+  ctx.lineTo(cx0(t_avg), cy0(0));
+  ctx.lineTo(cx0(t_avg), cy0(H2));
+  ctx.lineTo(cx0(0), cy0(H2));
+  ctx.closePath();
+  ctx.stroke();
+  ctx.setLineDash([]);
+
+  // Deformed shape
+  ctx.strokeStyle = '#60a5fa';
+  ctx.lineWidth = 2;
+  ctx.beginPath();
+  for (let i = 0; i <= n; i++) {
+    const y = (n - i) * Le; // height from base
+    const u = fem.U[i * 2] * amp; // amplified displacement
+    const x_front = u;
+    const x_back  = t_avg + u;
+    if (i === 0) {
+      ctx.moveTo(cx0(x_front), cy0(y));
+    } else {
+      ctx.lineTo(cx0(x_front), cy0(y));
+    }
+  }
+  ctx.stroke();
+
+  // Moment diagram overlay
+  const M_max = Math.max(...fem.moments.map(Math.abs));
+  if (M_max > 0) {
+    ctx.strokeStyle = '#fb923c';
+    ctx.lineWidth = 1.5;
+    ctx.beginPath();
+    for (let i = 0; i <= n; i++) {
+      const y = (n - i) * Le;
+      const M = fem.moments[i] || 0;
+      const mx = t_avg + (M / M_max) * t_avg * 0.8;
+      if (i === 0) ctx.moveTo(cx0(mx), cy0(y));
+      else ctx.lineTo(cx0(mx), cy0(y));
+    }
+    ctx.stroke();
+  }
+
+  // Labels
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '11px monospace';
+  ctx.textAlign = 'center';
+  ctx.fillText(`u_máx = ${(fem.u_top*1000).toFixed(2)} mm (amp. ×${amp})`, CW/2, 20);
+  ctx.fillStyle = '#60a5fa';
+  ctx.fillText('—— Deformada', ox - 80, CH - 20);
+  ctx.fillStyle = '#fb923c';
+  ctx.fillText('—— Momentos', ox + 80, CH - 20);
+
+  // Base fixed symbol
+  ctx.strokeStyle = '#94a3b8';
+  ctx.lineWidth = 1.5;
+  for (let i = -2; i <= 2; i++) {
+    ctx.beginPath();
+    ctx.moveTo(cx0(i * 0.1), cy0(-0.05));
+    ctx.lineTo(cx0(i * 0.1 - 0.12), cy0(-0.15));
+    ctx.stroke();
+  }
+  ctx.beginPath();
+  ctx.moveTo(cx0(-0.25), cy0(0));
+  ctx.lineTo(cx0(t_avg + 0.25), cy0(0));
+  ctx.stroke();
+}
+
+// ============================================================
+// MEMORIAL RENDERING
+// ============================================================
+function renderMemorial(steps) {
+  let html = '';
+  let inSection = false;
+  for (const s of steps) {
+    if (s.section) {
+      if (inSection) html += '</div>';
+      html += `<div class="mem-section"><div class="mem-section-title">${s.section}</div>`;
+      inSection = true;
+    } else {
+      html += `
+        <div class="mem-step">
+          <div class="label">${s.label}</div>
+          <div class="formula">${s.formula}</div>
+          <div class="result">= ${s.result} ${s.unit||''}</div>
+        </div>`;
+    }
+  }
+  if (inSection) html += '</div>';
+  document.getElementById('memorial-content').innerHTML = html;
+}
+
+// ============================================================
+// PDF EXPORT
+// ============================================================
+function exportPDF() {
+  if (!lastResults) { alert('Execute o cálculo primeiro.'); return; }
+  const btn = document.getElementById('btn-pdf');
+  btn.innerHTML = '<span class="spinner"></span>';
+  btn.disabled = true;
+
+  const r = lastResults;
+  const p = r.p;
+  const date = new Date().toLocaleDateString('pt-BR');
+
+  const pdfDiv = document.getElementById('pdf-area');
+  pdfDiv.style.display = 'block';
+
+  document.getElementById('pdf-content').innerHTML = `
+    <div style="text-align:center;border-bottom:2px solid #1e40af;padding-bottom:1rem;margin-bottom:1.5rem;">
+      <h1 style="font-size:18pt;color:#1e3a8a;margin:0;">MEMORIAL DE CÁLCULO</h1>
+      <h2 style="font-size:14pt;color:#1e40af;margin:.5rem 0;">Muro de Contenção em Concreto Armado</h2>
+      <p style="color:#475569;margin:0;font-size:10pt;">Data: ${date} — Norma: ACI 318 / ASCE</p>
+    </div>
+
+    <h3 style="color:#1e3a8a;font-size:12pt;border-bottom:1px solid #dbeafe;padding-bottom:.3rem;">Dados do Projeto</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:1rem;">
+      <tr style="background:#eff6ff;">
+        <td style="padding:.3rem .5rem;"><b>H₂ (cortina)</b></td><td>${fmt(p.H2)} m</td>
+        <td><b>B (base)</b></td><td>${fmt(p.B)} m</td>
+        <td><b>D (embutimento)</b></td><td>${fmt(p.D)} m</td>
+      </tr>
+      <tr>
+        <td style="padding:.3rem .5rem;"><b>γ₁ (aterro)</b></td><td>${p.gamma1} kN/m³</td>
+        <td><b>φ₁</b></td><td>${p.phi1}°</td>
+        <td><b>α (inclinação)</b></td><td>${p.alpha}°</td>
+      </tr>
+      <tr style="background:#eff6ff;">
+        <td style="padding:.3rem .5rem;"><b>γ₂ (fundação)</b></td><td>${p.gamma2} kN/m³</td>
+        <td><b>φ₂</b></td><td>${p.phi2}°</td>
+        <td><b>c₂</b></td><td>${p.c2} kPa</td>
+      </tr>
+      <tr>
+        <td style="padding:.3rem .5rem;"><b>f'c</b></td><td>${p.fc} MPa</td>
+        <td><b>fy</b></td><td>${p.fy} MPa</td>
+        <td><b>Kh</b></td><td>${p.Kh}</td>
+      </tr>
+    </table>
+
+    <h3 style="color:#1e3a8a;font-size:12pt;border-bottom:1px solid #dbeafe;padding-bottom:.3rem;">Coeficientes de Empuxo</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:1rem;">
+      <tr style="background:#1e3a8a;color:#fff;"><th style="padding:.3rem;">Método</th><th>Ka</th><th>Ph (kN/m)</th><th>Mh (kN·m/m)</th></tr>
+      <tr style="background:#eff6ff;"><td style="padding:.3rem;text-align:center;">Rankine</td><td style="text-align:center;">${fmt4(r.Ka_R)}</td><td style="text-align:center;">${fmt2(r.act_R.Ph)}</td><td style="text-align:center;">${fmt2(r.act_R.Mh)}</td></tr>
+      <tr><td style="padding:.3rem;text-align:center;">Coulomb</td><td style="text-align:center;">${fmt4(r.Ka_C)}</td><td style="text-align:center;">${fmt2(r.act_C.Ph)}</td><td style="text-align:center;">${fmt2(r.act_C.Mh)}</td></tr>
+      ${r.Ka_MO ? `<tr style="background:#fef2f2;"><td style="padding:.3rem;text-align:center;">Mononobe-Okabe</td><td style="text-align:center;">${fmt4(r.Ka_MO)}</td><td style="text-align:center;">${fmt2(r.act_MO.Ph)}</td><td style="text-align:center;">${fmt2(r.act_MO.Mh)}</td></tr>` : ''}
+    </table>
+
+    <h3 style="color:#1e3a8a;font-size:12pt;border-bottom:1px solid #dbeafe;padding-bottom:.3rem;">Verificações de Estabilidade (Coulomb)</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:1rem;">
+      <tr style="background:#1e3a8a;color:#fff;"><th style="padding:.3rem;">Verificação</th><th>FS Calc.</th><th>FS Mín.</th><th>Resultado</th></tr>
+      <tr style="background:#eff6ff;"><td style="padding:.3rem;">Tombamento</td><td style="text-align:center;">${fmt2(r.stab_C.FS_vol)}</td><td style="text-align:center;">1.5</td><td style="text-align:center;color:${r.stab_C.vol_ok?'green':'red'};">${r.stab_C.vol_ok?'VERIFICA':'NÃO VERIFICA'}</td></tr>
+      <tr><td style="padding:.3rem;">Deslizamento</td><td style="text-align:center;">${fmt2(r.stab_C.FS_desl)}</td><td style="text-align:center;">1.5</td><td style="text-align:center;color:${r.stab_C.desl_ok?'green':'red'};">${r.stab_C.desl_ok?'VERIFICA':'NÃO VERIFICA'}</td></tr>
+      <tr style="background:#eff6ff;"><td style="padding:.3rem;">Cap. de Carga</td><td style="text-align:center;">${fmt2(r.stab_C.FS_cap)}</td><td style="text-align:center;">3.0</td><td style="text-align:center;color:${r.stab_C.cap_ok?'green':'red'};">${r.stab_C.cap_ok?'VERIFICA':'NÃO VERIFICA'}</td></tr>
+    </table>
+
+    <h3 style="color:#1e3a8a;font-size:12pt;border-bottom:1px solid #dbeafe;padding-bottom:.3rem;">Dimensionamento Estrutural (ACI 318)</h3>
+    <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:1rem;">
+      <tr style="background:#1e3a8a;color:#fff;"><th style="padding:.3rem;">Seção</th><th>Mu (kN·m/m)</th><th>As req. (cm²/m)</th><th>Armadura</th></tr>
+      <tr style="background:#eff6ff;"><td style="padding:.3rem;">Cortina — Base</td><td style="text-align:center;">${fmt2(r.struct.stem_base.Mu)}</td><td style="text-align:center;">${fmt2(r.struct.stem_base.As_adot)}</td><td style="text-align:center;">${r.struct.stem_base.bar.desc}</td></tr>
+      <tr><td style="padding:.3rem;">Cortina — Meio</td><td style="text-align:center;">${fmt2(r.struct.stem_mid.Mu)}</td><td style="text-align:center;">${fmt2(r.struct.stem_mid.As_adot)}</td><td style="text-align:center;">${r.struct.stem_mid.bar.desc}</td></tr>
+      <tr style="background:#eff6ff;"><td style="padding:.3rem;">Fundação — Ponta</td><td style="text-align:center;">${fmt2(r.struct.toe_sec.Mu)}</td><td style="text-align:center;">${fmt2(r.struct.toe_sec.As_adot)}</td><td style="text-align:center;">${r.struct.toe_sec.bar.desc}</td></tr>
+      <tr><td style="padding:.3rem;">Fundação — Calcanhar</td><td style="text-align:center;">${fmt2(r.struct.heel_sec.Mu)}</td><td style="text-align:center;">${fmt2(r.struct.heel_sec.As_adot)}</td><td style="text-align:center;">${r.struct.heel_sec.bar.desc}</td></tr>
+    </table>
+
+    <div style="margin-top:2rem;padding-top:1rem;border-top:1px solid #dbeafe;font-size:8pt;color:#94a3b8;text-align:center;">
+      Calculadora de Muros de Contenção — Análise por Rankine / Coulomb / Mononobe-Okabe · ACI 318 · FEM
+    </div>
+  `;
+
+  const opt = {
+    margin: [10, 10],
+    filename: `muro_de_contencao_${date.replace(/\//g,'-')}.pdf`,
+    image: { type: 'jpeg', quality: 0.98 },
+    html2canvas: { scale: 2, useCORS: true },
+    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(pdfDiv).save().then(() => {
+    pdfDiv.style.display = 'none';
+    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> PDF`;
+    btn.disabled = false;
+  });
+}
+
+// ============================================================
+// TABS
+// ============================================================
+document.addEventListener('DOMContentLoaded', () => {
+  document.querySelectorAll('.tab-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+      document.querySelectorAll('.tab-pane').forEach(p => p.classList.remove('active'));
+      btn.classList.add('active');
+      document.getElementById(btn.dataset.tab).classList.add('active');
+      // Re-draw canvases on tab switch
+      if (lastResults) {
+        setTimeout(() => {
+          if (btn.dataset.tab === 'tab-vis') {
+            drawWall(document.getElementById('canvas-wall'), lastResults.p, lastResults);
+            renderCharts(lastResults.pressProfile, lastResults.p);
+          }
+          if (btn.dataset.tab === 'tab-fem') {
+            drawFEM(document.getElementById('canvas-fem'), lastResults.p, lastResults.fem);
+          }
+        }, 50);
+      }
+    });
+  });
+
+  // Update t4 on input change
+  ['B','t3','t1'].forEach(id => {
+    const el = document.getElementById(id);
+    if (el) el.addEventListener('input', () => {
+      const B = parseFloat(document.getElementById('B').value)||0;
+      const t3 = parseFloat(document.getElementById('t3').value)||0;
+      const t1 = parseFloat(document.getElementById('t1').value)||0;
+      const t4 = Math.max(0, B - t3 - t1);
+      document.getElementById('t4-display').textContent = `Calcanhar (t4) = ${t4.toFixed(2)} m`;
+    });
+  });
+
+  loadDefaults();
+});
+</script>
+</body>
+</html>
