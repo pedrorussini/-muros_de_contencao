@@ -514,15 +514,18 @@ function calcKaeMononobe(phi1, alpha, delta_ws, Kh, Kv) {
   return num / (d1 * (1 + Math.sqrt(sn / sd)) ** 2);
 }
 
-function calcActiveForce(Ka, gamma1, q, Hp) {
-  // σ(z) = Ka*(q + gamma1*z), z from top
-  const Ph_rect = Ka * q * Hp;
-  const Ph_tri  = 0.5 * Ka * gamma1 * Hp ** 2;
+function calcActiveForce(Ka, gamma1, q, Hp, proj) {
+  // Pa resultante total (componentes retangular + triangular)
+  const Pa_rect = Ka * q * Hp;
+  const Pa_tri  = 0.5 * Ka * gamma1 * Hp ** 2;
+  // Componente horizontal: Ph = Pa × proj (cos δ para Coulomb, cos α para Rankine)
+  const Ph_rect = Pa_rect * proj;
+  const Ph_tri  = Pa_tri  * proj;
   const Ph      = Ph_rect + Ph_tri;
   const arm_rect = Hp / 2;
   const arm_tri  = Hp / 3;
-  const Mh = Ph_rect * arm_rect + Ph_tri * arm_tri; // moment about base
-  return { Ph, Mh, Ph_rect, Ph_tri, arm_rect, arm_tri };
+  const Mh = Ph_rect * arm_rect + Ph_tri * arm_tri;
+  return { Ph, Mh, Ph_rect, Ph_tri, arm_rect, arm_tri, Pa_rect, Pa_tri, proj };
 }
 
 function calcPassive(phi2, c2, gamma2, D) {
@@ -532,33 +535,51 @@ function calcPassive(phi2, c2, gamma2, D) {
 }
 
 function calcWeights(p) {
-  const { H2, B, D, tf, t1, t2, t3, t4, gamma1, gamma2, gammac, q } = p;
-  // Stem (tapered, per unit width)
-  const A_stem = (t1 + t2) / 2 * H2;
-  const W_stem = gammac * A_stem;
-  const x_stem = t3 + t1 / 2; // centroid from toe (simplified)
+  const { H2, B, D, tf, t1, t2, t3, t4, gamma1, gamma2, gammac, q, alpha } = p;
 
-  // Footing
+  // Cortina cônica — face do aterro é vertical (cara_vertical = interior)
+  // Parte retangular: largura t2, centroide em t3 + t2/2
+  const W_stem_rect = gammac * t2 * H2;
+  const x_stem_rect = t3 + t2 / 2;
+  // Parte triangular: base (t1−t2), centroide em t3 + t2 + (t1−t2)/3
+  const W_stem_tri  = gammac * 0.5 * (t1 - t2) * H2;
+  const x_stem_tri  = t3 + t2 + (t1 - t2) / 3;
+  const W_stem      = W_stem_rect + W_stem_tri;
+  const x_stem      = W_stem > 0 ? (W_stem_rect * x_stem_rect + W_stem_tri * x_stem_tri) / W_stem : t3 + t1 / 2;
+
+  // Fundação
   const W_foot = gammac * B * tf;
   const x_foot = B / 2;
 
-  // Soil on heel (above footing)
+  // Solo no calcanhar (acima da fundação)
   const W_heel = gamma1 * t4 * H2;
-  const x_heel = t3 + t1 + t4 / 2;
+  const x_heel = B - t4 / 2;
 
-  // Soil above toe cap (in front) — usually 0 for toe region
+  // Cunha triangular de solo por inclinação do aterro (α > 0)
+  // H1 = t4·tan(α)  →  base da cunha = t4,  altura = H1
+  const H1 = alpha > 0.001 ? t4 * Math.tan(toRad(alpha)) : 0;
+  const W_cunha = H1 > 0 ? 0.5 * H1 * t4 * gamma1 : 0;
+  const x_cunha = H1 > 0 ? B - t4 / 3 : 0;
+
+  // Solo na ponta (frente da fundação)
   const W_toe_soil = gamma2 * t3 * D;
   const x_toe_soil = t3 / 2;
 
-  // Surcharge on heel
+  // Sobrecarga no calcanhar
   const W_q = q * t4;
   const x_q = x_heel;
 
-  const W_total = W_stem + W_foot + W_heel + W_toe_soil + W_q;
-  const Mr = W_stem * x_stem + W_foot * x_foot + W_heel * x_heel +
-             W_toe_soil * x_toe_soil + W_q * x_q;
+  const W_total = W_stem + W_foot + W_heel + W_cunha + W_toe_soil + W_q;
+  const Mr = W_stem_rect * x_stem_rect + W_stem_tri * x_stem_tri
+           + W_foot     * x_foot
+           + W_heel     * x_heel
+           + W_cunha    * x_cunha
+           + W_toe_soil * x_toe_soil
+           + W_q        * x_q;
 
-  return { W_stem, x_stem, W_foot, x_foot, W_heel, x_heel,
+  return { W_stem, x_stem, W_stem_rect, x_stem_rect, W_stem_tri, x_stem_tri,
+           W_foot, x_foot, W_heel, x_heel,
+           W_cunha, x_cunha, H1,
            W_toe_soil, x_toe_soil, W_q, x_q, W_total, Mr };
 }
 
@@ -634,7 +655,8 @@ function calcStability(act, wts, p, passive, seismic = false) {
     lim_vol, lim_desl, lim_cap,
     vol_ok: FS_vol >= lim_vol, desl_ok: FS_desl >= lim_desl, cap_ok: FS_cap >= lim_cap,
     e, e_ok, e_lim, B_eff, q_toe, q_heel, qu,
-    Nc_val, Nq_val, Ng_val, Fcd, Fqd, Fci, Fqi, Fgd, Fgi, Kp, Pp, friction
+    Nc_val, Nq_val, Ng_val, Fcd, Fqd, Fci, Fqi, Fgd, Fgi, Kp, Pp, friction,
+    _wts: wts
   };
 }
 
@@ -841,17 +863,18 @@ function gaussSolve(A, b) {
 // ============================================================
 // PRESSURE PROFILE FOR CHARTS
 // ============================================================
-function calcPressureProfile(p, Ka_R, Ka_C, Ka_MO) {
+function calcPressureProfile(p, Ka_R, Ka_C, Ka_MO, Hp) {
   const nPts = 20;
-  const Hp = p.H2 + p.tf;
+  const proj_R = Math.cos(toRad(p.alpha));
+  const proj_C = Math.cos(toRad(p.delta_ws));
   const depths = Array.from({length:nPts+1}, (_,i) => i * Hp / nPts);
   const press = {
     depths,
-    rankine:  depths.map(z => Ka_R  * (p.q + p.gamma1 * z)),
-    coulomb:  depths.map(z => Ka_C  * (p.q + p.gamma1 * z)),
-    seismic:  Ka_MO ? depths.map(z => Ka_MO * (p.q + p.gamma1 * z)) : null,
-    shear:    depths.map(z => Ka_C * p.q * z + 0.5 * Ka_C * p.gamma1 * z**2),
-    moment:   depths.map(z => Ka_C * p.q * z**2 / 2 + Ka_C * p.gamma1 * z**3 / 6)
+    rankine: depths.map(z => Ka_R  * (p.q + p.gamma1 * z) * proj_R),
+    coulomb: depths.map(z => Ka_C  * (p.q + p.gamma1 * z) * proj_C),
+    seismic: Ka_MO ? depths.map(z => Ka_MO * (p.q + p.gamma1 * z) * proj_C) : null,
+    shear:   depths.map(z => Ka_C * proj_C * (p.q * z + 0.5 * p.gamma1 * z**2)),
+    moment:  depths.map(z => Ka_C * proj_C * (p.q * z**2 / 2 + p.gamma1 * z**3 / 6))
   };
   return press;
 }
@@ -860,8 +883,11 @@ function calcPressureProfile(p, Ka_R, Ka_C, Ka_MO) {
 // MEMORIAL DE CÁLCULO
 // ============================================================
 function generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, stab_MO, struct) {
-  const Hp = p.H2 + p.tf;
+  const H1 = p.alpha > 0.001 ? p.t4 * Math.tan(toRad(p.alpha)) : 0;
+  const Hp = p.H2 + p.tf + H1;
   const t4 = p.t4;
+  const proj_R = Math.cos(toRad(p.alpha));
+  const proj_C = Math.cos(toRad(p.delta_ws));
   const steps = [];
 
   const add = (label, formula, result, unit='') => steps.push({ label, formula, result, unit });
@@ -873,7 +899,10 @@ function generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, st
   add('Espessura da fundação', 'tf', fmt(p.tf), 'm');
   add('Projeção frontal (ponta)', 't3', fmt(p.t3), 'm');
   add('Calcanhar', `t4 = B − t3 − t1 = ${fmt(p.B)} − ${fmt(p.t3)} − ${fmt(p.t1)}`, fmt(t4), 'm');
-  add('Altura total de pressão', `Hp = H2 + tf = ${fmt(p.H2)} + ${fmt(p.tf)}`, fmt(Hp), 'm');
+  if (H1 > 0) {
+    add('Altura virtual do aterro (inclinação)', `H1 = t4 × tan(α) = ${fmt(t4)} × tan(${fmt(p.alpha)}°)`, fmt2(H1), 'm');
+  }
+  add('Altura total de pressão', `Hp = H2 + tf${H1 > 0 ? ' + H1' : ''} = ${fmt(p.H2)} + ${fmt(p.tf)}${H1 > 0 ? ' + ' + fmt2(H1) : ''}`, fmt2(Hp), 'm');
 
   // --- Seção 2: Coeficientes de Empuxo ---
   steps.push({ section: '2. Coeficientes de Empuxo Ativo' });
@@ -892,10 +921,16 @@ function generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, st
 
   // --- Seção 3: Forças Ativas ---
   steps.push({ section: '3. Forças de Empuxo Ativo (Coulomb)' });
-  add('Pressão retangular (sobrecarga)',
-    `Ph_rect = Ka · q · Hp = ${fmt4(Ka_C)} × ${fmt(p.q)} × ${fmt(Hp)}`, fmt2(act_C.Ph_rect), 'kN/m');
-  add('Pressão triangular (solo)',
-    `Ph_tri = ½ · Ka · γ₁ · Hp² = 0.5 × ${fmt4(Ka_C)} × ${fmt(p.gamma1)} × ${fmt(Hp)}²`, fmt2(act_C.Ph_tri), 'kN/m');
+  add('Projeção horizontal (cos δ)',
+    `proj = cos(δ) = cos(${fmt(p.delta_ws)}°)`, fmt4(proj_C));
+  add('Pa retangular (sobrecarga)',
+    `Pa_rect = Ka · q · Hp = ${fmt4(Ka_C)} × ${fmt(p.q)} × ${fmt2(Hp)}`, fmt2(act_C.Pa_rect), 'kN/m');
+  add('Pa triangular (solo)',
+    `Pa_tri = ½ · Ka · γ₁ · Hp² = 0.5 × ${fmt4(Ka_C)} × ${fmt(p.gamma1)} × ${fmt2(Hp)}²`, fmt2(act_C.Pa_tri), 'kN/m');
+  add('Ph retangular = Pa_rect × cos(δ)',
+    `Ph_rect = ${fmt2(act_C.Pa_rect)} × ${fmt4(proj_C)}`, fmt2(act_C.Ph_rect), 'kN/m');
+  add('Ph triangular = Pa_tri × cos(δ)',
+    `Ph_tri = ${fmt2(act_C.Pa_tri)} × ${fmt4(proj_C)}`, fmt2(act_C.Ph_tri), 'kN/m');
   add('Força horizontal total',
     `Ph = Ph_rect + Ph_tri = ${fmt2(act_C.Ph_rect)} + ${fmt2(act_C.Ph_tri)}`, fmt2(act_C.Ph), 'kN/m');
   add('Momento de tombamento (em relação à base)',
@@ -903,21 +938,22 @@ function generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, st
 
   // --- Seção 4: Pesos Componentes ---
   steps.push({ section: '4. Pesos dos Componentes' });
-  const wts_label = [
-    ['Cortina (concreto)', `γc × ((t1+t2)/2) × H2 = ${p.gammac}×${fmt((p.t1+p.t2)/2)}×${fmt(p.H2)}`],
-    ['Fundação (concreto)', `γc × B × tf = ${p.gammac}×${fmt(p.B)}×${fmt(p.tf)}`],
-    ['Solo calcanhar', `γ₁ × t4 × H2 = ${p.gamma1}×${fmt(t4)}×${fmt(p.H2)}`],
-    ['Solo ponta', `γ₂ × t3 × D = ${p.gamma2}×${fmt(p.t3)}×${fmt(p.D)}`],
-    ['Sobrecarga calcanhar', `q × t4 = ${p.q}×${fmt(t4)}`],
-  ];
-  const wt_vals = [
-    p.gammac * (p.t1+p.t2)/2 * p.H2,
-    p.gammac * p.B * p.tf,
-    p.gamma1 * t4 * p.H2,
-    p.gamma2 * p.t3 * p.D,
-    p.q * t4
-  ];
-  wts_label.forEach(([lab, form], i) => add(lab, form, fmt2(wt_vals[i]), 'kN/m'));
+  const wts = stab_C._wts || {};
+  add('Cortina — parte retangular (t2 × H2)',
+    `γc × t2 × H2 = ${p.gammac} × ${fmt(p.t2)} × ${fmt(p.H2)}, x=${fmt2(p.t3+p.t2/2)}m`,
+    fmt2(p.gammac * p.t2 * p.H2), 'kN/m');
+  add('Cortina — parte triangular ((t1−t2)/2 × H2)',
+    `γc × (t1−t2)/2 × H2 = ${p.gammac} × ${fmt((p.t1-p.t2)/2)} × ${fmt(p.H2)}, x=${fmt2(p.t3+p.t2+(p.t1-p.t2)/3)}m`,
+    fmt2(p.gammac * 0.5 * (p.t1-p.t2) * p.H2), 'kN/m');
+  add('Fundação (concreto)', `γc × B × tf = ${p.gammac} × ${fmt(p.B)} × ${fmt(p.tf)}`, fmt2(p.gammac*p.B*p.tf), 'kN/m');
+  add('Solo calcanhar', `γ₁ × t4 × H2 = ${p.gamma1} × ${fmt(t4)} × ${fmt(p.H2)}`, fmt2(p.gamma1*t4*p.H2), 'kN/m');
+  if (H1 > 0) {
+    add('Cunha do talude (triangular)',
+      `½ × H1 × t4 × γ₁ = 0.5 × ${fmt2(H1)} × ${fmt(t4)} × ${p.gamma1}, x=${fmt2(p.B - t4/3)}m`,
+      fmt2(0.5 * H1 * t4 * p.gamma1), 'kN/m');
+  }
+  add('Solo ponta', `γ₂ × t3 × D = ${p.gamma2} × ${fmt(p.t3)} × ${fmt(p.D)}`, fmt2(p.gamma2*p.t3*p.D), 'kN/m');
+  add('Sobrecarga calcanhar', `q × t4 = ${p.q} × ${fmt(t4)}`, fmt2(p.q*t4), 'kN/m');
   add('Força vertical total', `ΣW = Σ componentes`, fmt2(stab_C.W), 'kN/m');
   add('Momento resistente (em relação à ponta)', `ΣMr = Σ(Wi × xi)`, fmt2(stab_C.M_res), 'kN·m/m');
 
@@ -991,10 +1027,19 @@ function runCalculate() {
       const Ka_C  = calcKaCoulomb(p.phi1, p.alpha, p.delta_ws);
       const Ka_MO = calcKaeMononobe(p.phi1, p.alpha, p.delta_ws, p.Kh, p.Kv);
 
-      const Hp = p.H2 + p.tf;
-      const act_R  = calcActiveForce(Ka_R,  p.gamma1, p.q, Hp);
-      const act_C  = calcActiveForce(Ka_C,  p.gamma1, p.q, Hp);
-      const act_MO = Ka_MO ? calcActiveForce(Ka_MO, p.gamma1, p.q, Hp) : null;
+      // H1: extensão virtual do aterro acima do topo do muro (cunha de inclinação)
+      // H1 = t4 × tan(α),  Hp total = H2 + tf + H1
+      const H1 = p.alpha > 0.001 ? p.t4 * Math.tan(toRad(p.alpha)) : 0;
+      const Hp = p.H2 + p.tf + H1;
+
+      // Projeção da força resultante ativa para componente horizontal
+      const proj_R  = Math.cos(toRad(p.alpha));     // Rankine: Pa paralelo ao aterro
+      const proj_C  = Math.cos(toRad(p.delta_ws));  // Coulomb: Pa inclinado em δ da normal
+      const proj_MO = proj_C;                        // MO: mesma inclinação δ
+
+      const act_R  = calcActiveForce(Ka_R,  p.gamma1, p.q, Hp, proj_R);
+      const act_C  = calcActiveForce(Ka_C,  p.gamma1, p.q, Hp, proj_C);
+      const act_MO = Ka_MO ? calcActiveForce(Ka_MO, p.gamma1, p.q, Hp, proj_MO) : null;
 
       const wts     = calcWeights(p);
       const passive = calcPassive(p.phi2, p.c2, p.gamma2, p.D);
@@ -1005,10 +1050,11 @@ function runCalculate() {
 
       const struct  = calcStructural(p, stab_C, act_C);
       const fem     = calcFEM(p, stab_C, act_C);
-      const pressProfile = calcPressureProfile(p, Ka_R, Ka_C, Ka_MO);
+      const pressProfile = calcPressureProfile(p, Ka_R, Ka_C, Ka_MO, Hp);
       const memorial = generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, stab_MO, struct);
 
-      lastResults = { p, Ka_R, Ka_C, Ka_MO, act_R, act_C, act_MO,
+      lastResults = { p, Ka_R, Ka_C, Ka_MO, H1, Hp, proj_R, proj_C,
+                      act_R, act_C, act_MO,
                       stab_R, stab_C, stab_MO, struct, fem, pressProfile, memorial,
                       wts, passive };
 
