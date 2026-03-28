@@ -583,7 +583,7 @@ function calcWeights(p) {
            W_toe_soil, x_toe_soil, W_q, x_q, W_total, Mr };
 }
 
-function calcStability(act, wts, p, passive, seismic = false) {
+function calcStability(act, wts, p, passive, seismic = false, act_static = null) {
   const { W_total, Mr, W_stem, W_foot } = wts;
   const { Kp, Pp } = passive;
   const phi2r = toRad(p.phi2);
@@ -593,16 +593,30 @@ function calcStability(act, wts, p, passive, seismic = false) {
   let F_vert_seis = 0;
 
   if (seismic && p.Kh > 0) {
-    // Vertical seismic on weights
-    const Wmod = W_total * (1 - p.Kv);
-    const dW = W_total - Wmod;
-    W = Wmod;
-    M_res = Mr * (1 - p.Kv);
-    // Inertia on concrete (horizontal)
-    const F_inert = (W_stem + W_foot) * p.Kh;
+    const { W_heel, W_cunha, H1, W_toe_soil, x_toe_soil, W_q, x_q } = wts;
+    const Hp_seis = p.H2 + p.tf + H1;
+
+    // Edwin: ΣV sísmico usa apenas pesos estruturais + solo calcanhar (sem solo ponta e sem peso de sobrecarga)
+    const W_R  = W_total - W_toe_soil - W_q;
+    const Mr_R = Mr - W_toe_soil * x_toe_soil - W_q * x_q;
+
+    // Componente vertical de Pae adicionada a ΣV no calcanhar (Seed & Whitman)
+    const Pv_seis = Ph * Math.tan(toRad(p.delta_ws));
+    W = W_R + Pv_seis;
+    M_res = Mr_R + Pv_seis * p.B;
+
+    // 3. Braço Seed & Whitman (1970): Pa estático no braço original + ΔPae a 0.6×Hp
+    if (act_static && act_static.Ph > 0) {
+      const delta_Ph = Ph - act_static.Ph;
+      Mh = act_static.Mh + Math.max(0, delta_Ph) * 0.6 * Hp_seis;
+    }
+
+    // 4. Inércia horizontal no concreto + solo do calcanhar
+    const F_inert_conc = (W_stem + W_foot) * p.Kh;
+    const F_inert_soil = (W_heel + W_cunha) * p.Kh;
     const arm_inert = p.tf + p.H2 / 2;
-    Ph += F_inert;
-    Mh += F_inert * arm_inert;
+    Ph += F_inert_conc + F_inert_soil;
+    Mh += (F_inert_conc + F_inert_soil) * arm_inert;
   }
 
   // Overturning
@@ -1046,7 +1060,7 @@ function runCalculate() {
 
       const stab_R  = calcStability(act_R, wts, p, passive, false);
       const stab_C  = calcStability(act_C, wts, p, passive, false);
-      const stab_MO = act_MO ? calcStability(act_MO, wts, p, passive, true) : null;
+      const stab_MO = act_MO ? calcStability(act_MO, wts, p, passive, true, act_C) : null;
 
       const struct  = calcStructural(p, stab_C, act_C);
       const fem     = calcFEM(p, stab_C, act_C);
