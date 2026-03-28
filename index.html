@@ -696,21 +696,22 @@ function selectBar(As_cm2) {
   return { desc: '#8 (1") c/5cm', As: 5.10 / 0.05 };
 }
 
-function calcStructural(p, stab_C, act_C) {
+function calcStructural(p, stab_C, act_C, Ka_direct) {
   const { H2, tf, t1, t2, t3, t4, B, fc, fy, cover, gamma1, q, gammac, gamma2 } = p;
   const phi_flex = 0.9;
-  const fc_kpa   = fc * 1000; // kPa
-  const fy_kpa   = fy * 1000; // kPa
   const b = 1.0; // per unit width (m)
 
+  // designSection: fc e fy devem ser em MPa (ACI 318)
   function designSection(Mu_kNm, thick) {
-    const d = Math.max(0.05, thick - cover - 0.008); // effective depth
-    const Mu = Math.abs(Mu_kNm) * 1000; // N·m/m → use kN·m
-    const Rn = Mu / (phi_flex * b * d * d); // kN/m² = kPa
-    const ratio = 2 * Rn / (0.85 * fc_kpa);
-    let rho = (0.85 * fc_kpa / fy_kpa) * (1 - Math.sqrt(Math.max(0, 1 - ratio)));
-    const rho_min = Math.max(0.7 * Math.sqrt(fc_kpa) / fy_kpa, 1400 / fy_kpa);
-    const rho_max = 0.75 * 0.85 * 0.85 * fc_kpa / fy_kpa * 600 / (600 + fy);
+    const d = Math.max(0.05, thick - cover - 0.008); // profundidade efetiva
+    const Mu = Math.abs(Mu_kNm); // kN·m/m
+    // Rn em MPa: Mu[kN·m] / (φ·b[m]·d²[m²]·1000) = MPa
+    const Rn_MPa = Mu / (phi_flex * b * d * d * 1000);
+    const ratio = 2 * Rn_MPa / (0.85 * fc);
+    let rho = (0.85 * fc / fy) * (1 - Math.sqrt(Math.max(0, 1 - ratio)));
+    // ρ_min e ρ_max com fc e fy em MPa (ACI 318-14 §9.6.1.2)
+    const rho_min = Math.max(0.7 * Math.sqrt(fc) / fy, 1.4 / fy);
+    const rho_max = 0.75 * 0.85 * 0.85 * (fc / fy) * (600 / (600 + fy));
     rho = Math.max(rho, rho_min);
     const As_m2 = rho * b * d;    // m²/m
     const As_cm2 = As_m2 * 10000; // cm²/m
@@ -720,47 +721,51 @@ function calcStructural(p, stab_C, act_C) {
     return { Mu: Mu_kNm, d, rho, As_cm2, As_min_cm2, As_adot, bar, ok: rho <= rho_max };
   }
 
-  const Ka = stab_C.Kp !== undefined ? null : null; // reuse act_C Ka
-  const Ka_val = act_C.Ph / (0.5 * gamma1 * (H2 + tf) ** 2 + q * (H2 + tf)) || 0.3;
-  const Hp = H2 + tf;
+  // Usar Ka diretamente (Coulomb); fallback: back-calculate a partir de act_C
+  const Ka_val = Ka_direct !== undefined
+    ? Ka_direct
+    : (act_C.Ph / (0.5 * gamma1 * H2 ** 2 * Math.cos(toRad(p.delta_ws)) + q * H2 * Math.cos(toRad(p.delta_ws)))) || 0.3;
 
-  // === STEM BASE ===
-  // Moment at base of stem from active pressure over H2
-  const Ph_rect_s = Ka_val * q * H2;
-  const Ph_tri_s  = 0.5 * Ka_val * gamma1 * H2 ** 2;
-  const Ma_stem = Ph_rect_s * H2/2 + Ph_tri_s * H2/3;
-  const Mu_stem = 1.6 * Ma_stem;
+  // === CORTINA — BASE ===
+  // Forças características separadas: solo (DL) e sobrecarga (LL)
+  const V_d_s  = 0.5 * Ka_val * gamma1 * H2 ** 2; // kN/m — carga permanente
+  const V_q_s  = Ka_val * q * H2;                  // kN/m — sobrecarga (LL)
+  const M_d_s  = V_d_s * H2 / 3;
+  const M_q_s  = V_q_s * H2 / 2;
+  const Mu_stem = 1.4 * M_d_s + 1.7 * M_q_s;      // ACI 318: 1.4D + 1.7L
   const stem_base = designSection(Mu_stem, t1);
 
-  // === STEM MID ===
+  // === CORTINA — MEIO ===
   const H_mid = H2 / 2;
-  const Ph_rect_m = Ka_val * q * H_mid;
-  const Ph_tri_m  = 0.5 * Ka_val * gamma1 * H_mid ** 2;
-  const Ma_mid = Ph_rect_m * H_mid/2 + Ph_tri_m * H_mid/3;
-  const Mu_mid = 1.6 * Ma_mid;
-  const t_mid = (t1 + t2) / 2;
+  const V_d_m  = 0.5 * Ka_val * gamma1 * H_mid ** 2;
+  const V_q_m  = Ka_val * q * H_mid;
+  const M_d_m  = V_d_m * H_mid / 3;
+  const M_q_m  = V_q_m * H_mid / 2;
+  const Mu_mid = 1.4 * M_d_m + 1.7 * M_q_m;
+  const t_mid  = (t1 + t2) / 2;
   const stem_mid = designSection(Mu_mid, t_mid);
 
-  // === FOOTING — TOE (ponta) ===
-  // Upward soil pressure minus downward footing weight
-  // q_toe from stability results, q at face of stem = interpolate
+  // === FUNDAÇÃO — PONTA (toe) ===
+  // Pressão ascendente (solo) menos peso descendente da fundação
   const q_at_stem = stab_C.q_toe - (stab_C.q_toe - stab_C.q_heel) * t3 / B;
   const q_avg_toe = (stab_C.q_toe + q_at_stem) / 2;
-  const w_foot_toe = gammac * tf;
-  const net_toe = q_avg_toe - w_foot_toe;
-  const Ma_toe = net_toe * t3 ** 2 / 2;
-  const Mu_toe = 1.6 * Math.abs(Ma_toe);
+  const w_foot_toe = gammac * tf;   // DL: peso da fundação
+  const net_toe_DL = q_avg_toe - w_foot_toe;
+  const Ma_toe = net_toe_DL * t3 ** 2 / 2;
+  const Mu_toe = 1.4 * Math.abs(Ma_toe);  // reação e peso próprio = DL
   const toe_sec = designSection(Mu_toe, tf);
 
-  // === FOOTING — HEEL (calcanhar) ===
-  // Downward soil weight + footing weight minus upward soil pressure
+  // === FUNDAÇÃO — CALCANHAR (heel) ===
+  // Cargas descendentes: solo (DL) + sobrecarga (LL) + fundação (DL) menos pressão ascendente
   const q_at_heel = stab_C.q_heel;
-  const q_at_stem_heel = q_at_stem;
-  const q_avg_heel = (q_at_heel + q_at_stem_heel) / 2;
-  const w_soil_heel = gamma1 * H2 + q + gammac * tf;
-  const net_heel = w_soil_heel - q_avg_heel;
-  const Ma_heel = Math.abs(net_heel) * t4 ** 2 / 2;
-  const Mu_heel = 1.6 * Ma_heel;
+  const q_avg_heel = (q_at_heel + q_at_stem) / 2;
+  const w_DL_heel  = gamma1 * H2 * t4 + gammac * tf * t4; // kN/m (solo + fund)
+  const w_LL_heel  = q * t4;                               // kN/m (sobrecarga)
+  const arm_heel   = t4 / 2;
+  const M_DL_heel  = (gamma1 * H2 + gammac * tf) * arm_heel ** 2; // simplificado
+  const M_LL_heel  = q * arm_heel ** 2;
+  const M_reac_heel = q_avg_heel * t4 ** 2 / 2;
+  const Mu_heel = Math.max(0, 1.4 * M_DL_heel + 1.7 * M_LL_heel - 1.4 * M_reac_heel);
   const heel_sec = designSection(Mu_heel, tf);
 
   return { stem_base, stem_mid, toe_sec, heel_sec, Ka_val };
@@ -1062,7 +1067,7 @@ function runCalculate() {
       const stab_C  = calcStability(act_C, wts, p, passive, false);
       const stab_MO = act_MO ? calcStability(act_MO, wts, p, passive, true, act_C) : null;
 
-      const struct  = calcStructural(p, stab_C, act_C);
+      const struct  = calcStructural(p, stab_C, act_C, Ka_C);
       const fem     = calcFEM(p, stab_C, act_C);
       const pressProfile = calcPressureProfile(p, Ka_R, Ka_C, Ka_MO, Hp);
       const memorial = generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, stab_MO, struct);
