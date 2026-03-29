@@ -703,7 +703,7 @@ function calcStructural(p, stab_C, act_C, Ka_direct) {
 
   // designSection: fc e fy devem ser em MPa (ACI 318)
   function designSection(Mu_kNm, thick) {
-    const d = Math.max(0.05, thick - cover - 0.008); // profundidade efetiva
+    const d = Math.max(0.05, thick - cover); // profundidade efetiva (ACI: até centroide da armadura)
     const Mu = Math.abs(Mu_kNm); // kN·m/m
     // Rn em MPa: Mu[kN·m] / (φ·b[m]·d²[m²]·1000) = MPa
     const Rn_MPa = Mu / (phi_flex * b * d * d * 1000);
@@ -772,88 +772,199 @@ function calcStructural(p, stab_C, act_C, Ka_direct) {
 }
 
 // ============================================================
-// FEM ANALYSIS (simplified beam on elastic foundation)
+// FEM 2D — PLANO STRESS (triângulos CST + molas de Winkler)
+// Referência: Edwin Alarcón — muros_de_contencion
 // ============================================================
-function calcFEM(p, stab_C, act_C) {
-  const n = 10; // elements in stem
-  const H2 = p.H2;
-  const Le = H2 / n; // element length
-  const Ka = act_C.Ph / (0.5 * p.gamma1 * (H2 + p.tf) ** 2 + p.q * (H2 + p.tf)) || 0.3;
+function calcFEM(p, stab_C, act_C, Ka_direct) {
+  // ── Parâmetros de malha ─────────────────────────────────────
+  const NY_STEM = 10, NX_STEM = 4;
+  const NY_FOOT = 3;
+  const elem_w  = p.t1 / NX_STEM; // tamanho de referência (~0.175 m)
+  const NX_TOE  = Math.max(2, Math.min(6,  Math.round(p.t3 / elem_w)));
+  const NX_HEEL = Math.max(3, Math.min(12, Math.round(p.t4 / elem_w)));
 
-  // Stiffness: EI for stem
-  const E = 4700 * Math.sqrt(p.fc) * 1000; // MPa → kPa  (Ec = 4700√f'c MPa)
-  const t_avg = (p.t1 + p.t2) / 2;
-  const I = (1 * t_avg ** 3) / 12; // per unit width m⁴/m
-  const EI = E * I;
+  // ── Material ────────────────────────────────────────────────
+  const E  = 4700 * Math.sqrt(p.fc) * 1000; // kPa  (Ec = 4700√f'c MPa)
+  const nu = 0.2;
+  // Ka para carga lateral
+  const Ka = Ka_direct !== undefined ? Ka_direct
+    : (act_C.Ph / Math.max(1e-6,
+        0.5*p.gamma1*p.H2**2*Math.cos(toRad(p.delta_ws))
+        + p.q*p.H2*Math.cos(toRad(p.delta_ws)))) || 0.333;
 
-  // Build load vector: distributed lateral pressure
-  const nDOF = (n + 1) * 2; // 2 DOF per node: w (transverse) and θ (rotation)
-  const F = new Array(nDOF).fill(0);
-  const K_global = Array.from({length: nDOF}, () => new Array(nDOF).fill(0));
+  // ── Geração de malha ────────────────────────────────────────
+  const nodes = [];            // [[x, y], ...]
+  const nodeMap = new Map();
+  const elems   = [];          // [[i0, i1, i2], ...] — CCW
 
-  // Beam element stiffness matrix (local = global for vertical beam)
-  function kElem(EI, L) {
-    const k = [
-      [ 12*EI/L**3,   6*EI/L**2, -12*EI/L**3,   6*EI/L**2],
-      [  6*EI/L**2,   4*EI/L,    - 6*EI/L**2,   2*EI/L   ],
-      [-12*EI/L**3,  -6*EI/L**2,  12*EI/L**3,  -6*EI/L**2],
-      [  6*EI/L**2,   2*EI/L,    - 6*EI/L**2,   4*EI/L   ]
+  const nKey = (x, y) => `${Math.round(x*1e5)},${Math.round(y*1e5)}`;
+  const addN = (x, y) => {
+    const k = nKey(x, y);
+    if (!nodeMap.has(k)) { nodeMap.set(k, nodes.length); nodes.push([x, y]); }
+    return nodeMap.get(k);
+  };
+  // Divide quad em 2 triângulos CCW
+  const quad = (n00, n10, n01, n11) => {
+    elems.push([n00, n10, n11]);
+    elems.push([n00, n11, n01]);
+  };
+
+  // Cortina (trapézio): face esquerda vertical em x=t3; face direita cônica
+  for (let i = 0; i < NY_STEM; i++) {
+    const y0 = i * p.H2 / NY_STEM, y1 = (i+1) * p.H2 / NY_STEM;
+    const xr0 = p.t3 + p.t1 - (p.t1-p.t2) * y0/p.H2; // largura na base da camada
+    const xr1 = p.t3 + p.t1 - (p.t1-p.t2) * y1/p.H2; // largura no topo da camada
+    for (let j = 0; j < NX_STEM; j++) {
+      const f0 = j/NX_STEM, f1 = (j+1)/NX_STEM;
+      quad(
+        addN(p.t3 + f0*(xr0-p.t3), y0), addN(p.t3 + f1*(xr0-p.t3), y0),
+        addN(p.t3 + f0*(xr1-p.t3), y1), addN(p.t3 + f1*(xr1-p.t3), y1)
+      );
+    }
+  }
+  // Fundação sob cortina: x=[t3, t3+t1] — divide igual ao stem → nós y=0 compartilhados
+  for (let i = 0; i < NY_FOOT; i++) {
+    const y0 = -p.tf + i*p.tf/NY_FOOT, y1 = -p.tf + (i+1)*p.tf/NY_FOOT;
+    for (let j = 0; j < NX_STEM; j++) {
+      quad(
+        addN(p.t3 + j*p.t1/NX_STEM, y0),     addN(p.t3 + (j+1)*p.t1/NX_STEM, y0),
+        addN(p.t3 + j*p.t1/NX_STEM, y1),     addN(p.t3 + (j+1)*p.t1/NX_STEM, y1)
+      );
+    }
+  }
+  // Fundação ponta: x=[0, t3]
+  for (let i = 0; i < NY_FOOT; i++) {
+    const y0 = -p.tf + i*p.tf/NY_FOOT, y1 = -p.tf + (i+1)*p.tf/NY_FOOT;
+    for (let j = 0; j < NX_TOE; j++) {
+      quad(
+        addN(j*p.t3/NX_TOE, y0),     addN((j+1)*p.t3/NX_TOE, y0),
+        addN(j*p.t3/NX_TOE, y1),     addN((j+1)*p.t3/NX_TOE, y1)
+      );
+    }
+  }
+  // Fundação calcanhar: x=[t3+t1, B]
+  const xhs = p.t3 + p.t1;
+  for (let i = 0; i < NY_FOOT; i++) {
+    const y0 = -p.tf + i*p.tf/NY_FOOT, y1 = -p.tf + (i+1)*p.tf/NY_FOOT;
+    for (let j = 0; j < NX_HEEL; j++) {
+      quad(
+        addN(xhs + j*p.t4/NX_HEEL, y0),     addN(xhs + (j+1)*p.t4/NX_HEEL, y0),
+        addN(xhs + j*p.t4/NX_HEEL, y1),     addN(xhs + (j+1)*p.t4/NX_HEEL, y1)
+      );
+    }
+  }
+
+  const N = nodes.length;
+  const nDOF = 2 * N;
+
+  // ── Matriz de rigidez global ─────────────────────────────────
+  const f_mat = E / (1 - nu*nu);
+  const C = [
+    [f_mat,        f_mat*nu,      0               ],
+    [f_mat*nu,     f_mat,         0               ],
+    [0,            0,             f_mat*(1-nu)/2  ]
+  ];
+  const K = Array.from({length: nDOF}, () => new Float64Array(nDOF));
+  const elemB = []; // armazena {B, A, tri} para pós-processamento
+
+  for (const tri of elems) {
+    const [i0, i1, i2] = tri;
+    const [x1, y1] = nodes[i0], [x2, y2] = nodes[i1], [x3, y3] = nodes[i2];
+    const A2 = (x2-x1)*(y3-y1) - (x3-x1)*(y2-y1); // 2×área com sinal
+    const A  = Math.abs(A2) / 2;
+    if (A < 1e-14) { elemB.push(null); continue; }
+    const s = 1 / A2; // 1/(2A) com sinal (garante consistência para CCW e CW)
+    const y23=y2-y3, y31=y3-y1, y12=y1-y2;
+    const x32=x3-x2, x13=x1-x3, x21=x2-x1;
+    const B = [
+      [y23*s, 0,     y31*s, 0,     y12*s, 0    ],
+      [0,     x32*s, 0,     x13*s, 0,     x21*s],
+      [x32*s, y23*s, x13*s, y31*s, x21*s, y12*s]
     ];
-    return k;
+    elemB.push({B, A, tri});
+    const dofs = [2*i0, 2*i0+1, 2*i1, 2*i1+1, 2*i2, 2*i2+1];
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 6; c++) {
+        let v = 0;
+        for (let k = 0; k < 3; k++) {
+          let cb = 0;
+          for (let l = 0; l < 3; l++) cb += C[k][l] * B[l][c];
+          v += B[k][r] * cb;
+        }
+        K[dofs[r]][dofs[c]] += v * A; // th=1 m/m
+      }
+    }
   }
 
-  // Assemble global stiffness
-  for (let e = 0; e < n; e++) {
-    const k = kElem(EI, Le);
-    const dofs = [e*2, e*2+1, (e+1)*2, (e+1)*2+1];
-    for (let i = 0; i < 4; i++)
-      for (let j = 0; j < 4; j++)
-        K_global[dofs[i]][dofs[j]] += k[i][j];
+  // ── Molas de Winkler (base da fundação: y = −tf) ────────────
+  const ks = stab_C.qu > 0 ? stab_C.qu / 0.0254 : 5000; // kN/m³
+  const baseNds = nodes
+    .map((n, i) => ({x: n[0], y: n[1], id: i}))
+    .filter(n => Math.abs(n.y + p.tf) < 1e-3)
+    .sort((a, b) => a.x - b.x);
+  for (let i = 0; i < baseNds.length; i++) {
+    const dx = (i > 0 ? (baseNds[i].x - baseNds[i-1].x)/2 : 0)
+             + (i < baseNds.length-1 ? (baseNds[i+1].x - baseNds[i].x)/2 : 0);
+    K[2*baseNds[i].id+1][2*baseNds[i].id+1] += ks * dx; // y-DOF
   }
 
-  // Lateral pressure load (uniform for simplicity)
-  for (let e = 0; e < n; e++) {
-    const z_mid = (e + 0.5) * Le; // depth from top
-    const p_z = Ka * (p.q + p.gamma1 * z_mid); // kPa
-    const f_equiv = p_z * Le / 2; // equivalent nodal force (kN/m)
-    F[e*2]       += f_equiv;
-    F[(e+1)*2]   += f_equiv;
-    F[e*2+1]     += p_z * Le**2 / 12;
-    F[(e+1)*2+1] -= p_z * Le**2 / 12;
+  // ── Forças externas: pressão lateral na face direita da cortina ──
+  const F = new Float64Array(nDOF);
+  const xFace = y => p.t3 + p.t1 - (p.t1-p.t2) * Math.min(Math.max(y,0), p.H2) / p.H2;
+  const faceDireita = nodes
+    .map((n, i) => ({x: n[0], y: n[1], id: i}))
+    .filter(n => n.y >= -1e-3 && n.y <= p.H2+1e-3 &&
+                 Math.abs(n.x - xFace(n.y)) < 1e-3)
+    .sort((a, b) => a.y - b.y);
+  const pLat = y => Ka * (p.q + p.gamma1 * Math.max(0, p.H2 - y)); // kPa
+  for (let i = 0; i < faceDireita.length-1; i++) {
+    const na=faceDireita[i], nb=faceDireita[i+1];
+    const pa=pLat(na.y), pb=pLat(nb.y);
+    const h = nb.y - na.y;
+    F[2*na.id] -= (2*pa + pb)/6 * h; // força em −x (kN/m por metro de largura)
+    F[2*nb.id] -= (pa + 2*pb)/6 * h;
   }
 
-  // Boundary conditions: fixed at base (DOF 2n and 2n+1 = 0)
-  const base_dof = n * 2;
-  const free_dofs = Array.from({length: nDOF}, (_, i) => i)
-                         .filter(i => i !== base_dof && i !== base_dof+1);
-  const nFree = free_dofs.length;
-  const K_free = free_dofs.map(i => free_dofs.map(j => K_global[i][j]));
-  const F_free = free_dofs.map(i => F[i]);
+  // ── Condições de contorno: fixar x de um nó central da base ──
+  const anchorId = baseNds[Math.floor(baseNds.length/2)].id;
+  const fixed = new Set([2 * anchorId]); // impede translação rígida horizontal
 
-  // Solve by Gaussian elimination
-  const U_free = gaussSolve(K_free, F_free);
-  const U = new Array(nDOF).fill(0);
-  free_dofs.forEach((dof, i) => U[dof] = U_free[i]);
+  // ── Resolver K·U = F ─────────────────────────────────────────
+  const freeDOFs = Array.from({length: nDOF}, (_, i) => i).filter(i => !fixed.has(i));
+  const Kf = freeDOFs.map(i => freeDOFs.map(j => K[i][j]));
+  const Ff = freeDOFs.map(i => F[i]);
+  const Uf_arr = gaussSolve(Kf, Ff);
+  const U = new Float64Array(nDOF);
+  freeDOFs.forEach((dof, i) => U[dof] = Uf_arr[i]);
 
-  // Max displacement at top
-  const u_top = U[0]; // horizontal displacement at top
-  const theta_top = U[1];
+  // ── Pós-processamento: tensões Syy por elemento ──────────────
+  const Syy_elem = elems.map((_, ei) => {
+    const ed = elemB[ei];
+    if (!ed) return 0;
+    const {B, tri} = ed;
+    const ue = [U[2*tri[0]], U[2*tri[0]+1], U[2*tri[1]], U[2*tri[1]+1],
+                U[2*tri[2]], U[2*tri[2]+1]];
+    const eps = [0, 0, 0];
+    for (let r = 0; r < 3; r++) for (let c = 0; c < 6; c++) eps[r] += B[r][c]*ue[c];
+    return C[1][0]*eps[0] + C[1][1]*eps[1] + C[1][2]*eps[2]; // Syy (kPa)
+  });
 
-  // Bending moments at each node
-  const moments = [];
-  for (let e = 0; e < n; e++) {
-    const dofs = [e*2, e*2+1, (e+1)*2, (e+1)*2+1];
-    const u_e  = dofs.map(d => U[d]);
-    const M_start = EI / Le * (6/Le * u_e[0] + 4 * u_e[1] - 6/Le * u_e[2] + 2 * u_e[3]);
-    const M_end   = EI / Le * (-6/Le * u_e[0] + 2 * u_e[1] + 6/Le * u_e[2] + 4 * u_e[3]);
-    moments.push(M_start);
-    if (e === n-1) moments.push(M_end);
-  }
+  // Métricas de deslocamento
+  const crownNds = nodes.map((n,i) => ({x:n[0],y:n[1],id:i}))
+                        .filter(n => Math.abs(n.y - p.H2) < 1e-3);
+  const ux_crown   = crownNds.length ? crownNds.reduce((s,n)=>s+U[2*n.id],   0)/crownNds.length : 0;
+  const uy_crown   = crownNds.length ? crownNds.reduce((s,n)=>s+U[2*n.id+1], 0)/crownNds.length : 0;
+  const settle_max = baseNds.length  ? Math.min(...baseNds.map(n=>U[2*n.id+1])) : 0;
+  const Syy_max    = Math.max(...Syy_elem.map(Math.abs), 1e-6);
+  const Syy_ten    = Math.max(...Syy_elem);  // tensão (tração +)
+  const Syy_com    = Math.min(...Syy_elem);  // tensão (compressão −)
 
   return {
-    n, Le, EI, u_top, theta_top,
-    displacements: free_dofs.map((d, i) => ({ dof:d, u:U_free[i] })),
-    moments, U
+    nodes, elems, Syy_elem, U,
+    ux_crown, uy_crown, settle_max,
+    Syy_max, Syy_ten, Syy_com,
+    ks, Ka, faceDireita,
+    nElems: elems.length, nNodes: nodes.length
   };
 }
 
@@ -1068,7 +1179,7 @@ function runCalculate() {
       const stab_MO = act_MO ? calcStability(act_MO, wts, p, passive, true, act_C) : null;
 
       const struct  = calcStructural(p, stab_C, act_C, Ka_C);
-      const fem     = calcFEM(p, stab_C, act_C);
+      const fem     = calcFEM(p, stab_C, act_C, Ka_C);
       const pressProfile = calcPressureProfile(p, Ka_R, Ka_C, Ka_MO, Hp);
       const memorial = generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, stab_MO, struct);
 
@@ -1210,22 +1321,21 @@ function renderResults(r) {
     <table class="res-table">
       <thead><tr><th>Parâmetro</th><th>Valor</th></tr></thead>
       <tbody>
-        <tr><td>Deslocamento horizontal no topo</td><td>${(fem.u_top*1000).toFixed(2)} mm</td></tr>
-        <tr><td>Rotação no topo</td><td>${(fem.theta_top*1000).toFixed(3)} mrad</td></tr>
-        <tr><td>N° de elementos</td><td>${fem.n}</td></tr>
-        <tr><td>EI (kN·m²/m)</td><td>${fmt2(fem.EI)}</td></tr>
+        <tr><td>Desl. horizontal na coroa</td><td>${(fem.ux_crown*1000).toFixed(2)} mm</td></tr>
+        <tr><td>Desl. vertical na coroa</td><td>${(fem.uy_crown*1000).toFixed(2)} mm</td></tr>
+        <tr><td>Recalamento máx. (base)</td><td>${(Math.abs(fem.settle_max)*1000).toFixed(2)} mm</td></tr>
+        <tr><td>Nós / Elementos</td><td>${fem.nNodes} / ${fem.nElems}</td></tr>
+        <tr><td>Módulo de reação ks</td><td>${fmt2(fem.ks)} kN/m³</td></tr>
       </tbody>
     </table>`;
 
-  const M_max = Math.max(...fem.moments.map(Math.abs));
-  const M_base = Math.abs(fem.moments[fem.moments.length-1]);
   document.getElementById('tbl-fem-forces').innerHTML = `
     <table class="res-table">
       <thead><tr><th>Parâmetro</th><th>Valor</th></tr></thead>
       <tbody>
-        <tr><td>Momento máximo</td><td>${fmt2(M_max)} kN·m/m</td></tr>
-        <tr><td>Momento na base</td><td>${fmt2(M_base)} kN·m/m</td></tr>
-        <tr><td>Mola de fundação (approx.)</td><td>${fmt2(stab_C.qu / (p.tf))} kN/m²/m</td></tr>
+        <tr><td>Syy máx. (abs)</td><td>${fmt2(fem.Syy_max)} kPa = ${(fem.Syy_max/98.0665).toFixed(2)} kgf/cm²</td></tr>
+        <tr><td>Tensão de tração máx.</td><td>${fmt2(fem.Syy_ten)} kPa</td></tr>
+        <tr><td>Tensão de compressão máx.</td><td>${fmt2(fem.Syy_com)} kPa</td></tr>
       </tbody>
     </table>`;
 
@@ -1459,92 +1569,106 @@ function drawWall(canvas, p, r) {
 // ============================================================
 function drawFEM(canvas, p, fem) {
   const ctx = canvas.getContext('2d');
-  const CW = canvas.width;
-  const CH = canvas.height;
+  const CW = canvas.width, CH = canvas.height;
   ctx.clearRect(0, 0, CW, CH);
+  if (!fem || !fem.nodes || fem.nodes.length === 0) return;
 
-  const n = fem.n;
-  const Le = fem.Le;
-  const H2 = p.H2;
-  const t_avg = (p.t1 + p.t2) / 2;
+  // Transformação de coordenadas
+  const PAD = 40, PAD_R = 55;
+  const x_range = p.B, y_range = p.H2 + p.tf;
+  const scale = Math.min((CW - PAD - PAD_R) / x_range, (CH - PAD - 30) / y_range);
+  const ox = PAD;
+  const oy = CH - PAD + p.tf * scale; // y=0 em pixels
+  const cx = x => ox + x * scale;
+  const cy = y => oy - y * scale;
 
-  const scale = Math.min((CH * 0.75) / H2, (CW * 0.35) / t_avg);
-  const amp = 500; // amplification factor for displacements
-  const ox = CW * 0.38;
-  const oy = CH * 0.88;
+  const AMP = 500;
 
-  const cx0 = x => ox + x * scale;
-  const cy0 = y => oy - y * scale;
+  // ── Heatmap de tensões Syy ───────────────────────────────────
+  for (let e = 0; e < fem.elems.length; e++) {
+    const tri = fem.elems[e];
+    const Syy = fem.Syy_elem[e] || 0;
+    const norm = Math.max(-1, Math.min(1, Syy / fem.Syy_max));
+    let r, g, b;
+    if (norm >= 0) { r=255; g=Math.round(255*(1-norm)); b=Math.round(255*(1-norm)); }
+    else           { r=Math.round(255*(1+norm)); g=Math.round(255*(1+norm)); b=255;  }
+    ctx.fillStyle = `rgb(${r},${g},${b})`;
+    ctx.beginPath();
+    ctx.moveTo(cx(fem.nodes[tri[0]][0]), cy(fem.nodes[tri[0]][1]));
+    ctx.lineTo(cx(fem.nodes[tri[1]][0]), cy(fem.nodes[tri[1]][1]));
+    ctx.lineTo(cx(fem.nodes[tri[2]][0]), cy(fem.nodes[tri[2]][1]));
+    ctx.closePath();
+    ctx.fill();
+    ctx.strokeStyle = 'rgba(15,23,42,0.35)';
+    ctx.lineWidth = 0.4;
+    ctx.stroke();
+  }
 
-  // Original outline
-  ctx.strokeStyle = '#334155';
-  ctx.lineWidth = 1.5;
+  // ── Contorno original (tracejado) ───────────────────────────
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 1.2;
   ctx.setLineDash([4, 3]);
   ctx.beginPath();
-  ctx.moveTo(cx0(0), cy0(0));
-  ctx.lineTo(cx0(t_avg), cy0(0));
-  ctx.lineTo(cx0(t_avg), cy0(H2));
-  ctx.lineTo(cx0(0), cy0(H2));
+  ctx.moveTo(cx(p.t3), cy(0));
+  ctx.lineTo(cx(p.t3), cy(p.H2));
+  ctx.lineTo(cx(p.t3 + p.t2), cy(p.H2));
+  ctx.lineTo(cx(p.t3 + p.t1), cy(0));
+  ctx.moveTo(cx(0), cy(0));
+  ctx.lineTo(cx(p.B), cy(0));
+  ctx.lineTo(cx(p.B), cy(-p.tf));
+  ctx.lineTo(cx(0), cy(-p.tf));
   ctx.closePath();
   ctx.stroke();
   ctx.setLineDash([]);
 
-  // Deformed shape
-  ctx.strokeStyle = '#60a5fa';
-  ctx.lineWidth = 2;
-  ctx.beginPath();
-  for (let i = 0; i <= n; i++) {
-    const y = (n - i) * Le; // height from base
-    const u = fem.U[i * 2] * amp; // amplified displacement
-    const x_front = u;
-    const x_back  = t_avg + u;
-    if (i === 0) {
-      ctx.moveTo(cx0(x_front), cy0(y));
-    } else {
-      ctx.lineTo(cx0(x_front), cy0(y));
-    }
-  }
-  ctx.stroke();
-
-  // Moment diagram overlay
-  const M_max = Math.max(...fem.moments.map(Math.abs));
-  if (M_max > 0) {
-    ctx.strokeStyle = '#fb923c';
-    ctx.lineWidth = 1.5;
+  // ── Deformada: face direita da cortina ───────────────────────
+  if (fem.faceDireita && fem.faceDireita.length > 1) {
+    ctx.strokeStyle = '#f97316';
+    ctx.lineWidth = 2;
     ctx.beginPath();
-    for (let i = 0; i <= n; i++) {
-      const y = (n - i) * Le;
-      const M = fem.moments[i] || 0;
-      const mx = t_avg + (M / M_max) * t_avg * 0.8;
-      if (i === 0) ctx.moveTo(cx0(mx), cy0(y));
-      else ctx.lineTo(cx0(mx), cy0(y));
-    }
+    fem.faceDireita.forEach((n, i) => {
+      const xd = n.x + fem.U[2*n.id] * AMP;
+      const yd = n.y + fem.U[2*n.id+1] * AMP;
+      i === 0 ? ctx.moveTo(cx(xd), cy(yd)) : ctx.lineTo(cx(xd), cy(yd));
+    });
     ctx.stroke();
   }
 
-  // Labels
+  // ── Escala de cores (legenda lateral) ───────────────────────
+  const lx = CW - PAD_R + 8, ly1 = 40, ly2 = CH - 40;
+  const lh = ly2 - ly1;
+  const grad = ctx.createLinearGradient(0, ly1, 0, ly2);
+  grad.addColorStop(0,   'rgb(255,0,0)');
+  grad.addColorStop(0.5, 'rgb(255,255,255)');
+  grad.addColorStop(1,   'rgb(0,0,255)');
+  ctx.fillStyle = grad;
+  ctx.fillRect(lx, ly1, 10, lh);
+  ctx.strokeStyle = '#475569';
+  ctx.lineWidth = 0.5;
+  ctx.strokeRect(lx, ly1, 10, lh);
+  const Sm = fem.Syy_max / 98.0665; // kPa → kgf/cm²
   ctx.fillStyle = '#94a3b8';
-  ctx.font = '11px monospace';
+  ctx.font = '9px monospace';
+  ctx.textAlign = 'left';
+  ctx.fillText(`+${Sm.toFixed(2)}`, lx + 13, ly1 + 5);
+  ctx.fillText('0',               lx + 13, ly1 + lh/2 + 4);
+  ctx.fillText(`-${Sm.toFixed(2)}`,lx + 13, ly2 + 4);
+  ctx.fillStyle = '#64748b';
+  ctx.font = '9px monospace';
+  ctx.save();
+  ctx.translate(lx + 5, ly1 + lh/2);
+  ctx.rotate(-Math.PI/2);
   ctx.textAlign = 'center';
-  ctx.fillText(`u_máx = ${(fem.u_top*1000).toFixed(2)} mm (amp. ×${amp})`, CW/2, 20);
-  ctx.fillStyle = '#60a5fa';
-  ctx.fillText('—— Deformada', ox - 80, CH - 20);
-  ctx.fillStyle = '#fb923c';
-  ctx.fillText('—— Momentos', ox + 80, CH - 20);
+  ctx.fillText('Syy  kgf/cm²', 0, -14);
+  ctx.restore();
 
-  // Base fixed symbol
-  ctx.strokeStyle = '#94a3b8';
-  ctx.lineWidth = 1.5;
-  for (let i = -2; i <= 2; i++) {
-    ctx.beginPath();
-    ctx.moveTo(cx0(i * 0.1), cy0(-0.05));
-    ctx.lineTo(cx0(i * 0.1 - 0.12), cy0(-0.15));
-    ctx.stroke();
-  }
-  ctx.beginPath();
-  ctx.moveTo(cx0(-0.25), cy0(0));
-  ctx.lineTo(cx0(t_avg + 0.25), cy0(0));
-  ctx.stroke();
+  // ── Rótulos ──────────────────────────────────────────────────
+  ctx.textAlign = 'left';
+  ctx.fillStyle = '#94a3b8';
+  ctx.font = '10px monospace';
+  ctx.fillText(`dx = ${(fem.ux_crown*1000).toFixed(2)} mm  (×${AMP})`, 4, 13);
+  ctx.fillStyle = '#f97316';
+  ctx.fillText('── deformada', 4, 26);
 }
 
 // ============================================================
