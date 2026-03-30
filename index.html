@@ -6,10 +6,9 @@
   <title>Calculadora de Muros de Contenção</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8/build/index.min.js"></script>
   <script>
     tailwind.config = {
-      darkMode: 'class',
       theme: {
         extend: {
           colors: {
@@ -20,116 +19,121 @@
     }
   </script>
   <style>
-    :root { --sidebar-w: 340px; }
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background:#0f172a; color:#e2e8f0; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background:#f8fafc; color:#1e293b; margin:0; }
 
     /* Scrollbars */
     ::-webkit-scrollbar { width:6px; height:6px; }
-    ::-webkit-scrollbar-track { background:#1e293b; }
-    ::-webkit-scrollbar-thumb { background:#475569; border-radius:3px; }
+    ::-webkit-scrollbar-track { background:#f1f5f9; }
+    ::-webkit-scrollbar-thumb { background:#cbd5e1; border-radius:3px; }
 
     /* Input fields */
     .inp {
       width:100%; padding:0.35rem 0.5rem; border-radius:0.375rem;
-      background:#1e293b; border:1px solid #334155; color:#e2e8f0;
+      background:#f8fafc; border:1px solid #e2e8f0; color:#1e293b;
       font-size:0.85rem; transition: border-color .15s;
     }
-    .inp:focus { outline:none; border-color:#3b82f6; box-shadow:0 0 0 2px rgba(59,130,246,.3); }
-    label { font-size:0.78rem; color:#94a3b8; display:block; margin-bottom:2px; }
+    .inp:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15); }
+    label { font-size:0.78rem; color:#64748b; display:block; margin-bottom:2px; }
 
     /* Tabs */
-    .tab-btn { padding:.45rem 1rem; border-radius:.375rem; font-size:.82rem; font-weight:500;
-               color:#94a3b8; transition:all .15s; cursor:pointer; white-space:nowrap; }
-    .tab-btn:hover { color:#e2e8f0; background:#1e293b; }
-    .tab-btn.active { background:#3b82f6; color:#fff; }
+    .tab-btn { padding:.5rem 1rem; font-size:.82rem; font-weight:500; border-bottom:2px solid transparent;
+               color:#64748b; transition:all .15s; cursor:pointer; white-space:nowrap; background:none; border-left:none; border-right:none; border-top:none; }
+    .tab-btn:hover { color:#1e293b; }
+    .tab-btn.active { color:#2563eb; border-bottom-color:#2563eb; font-weight:600; }
     .tab-pane { display:none; }
     .tab-pane.active { display:block; }
 
     /* Cards */
-    .card { background:#1e293b; border:1px solid #334155; border-radius:.625rem; padding:1rem; }
-    .card-title { font-size:.8rem; font-weight:600; color:#94a3b8; text-transform:uppercase;
-                  letter-spacing:.05em; margin-bottom:.75rem; }
+    .card { background:#fff; border:1px solid #e2e8f0; border-radius:.625rem; padding:1rem;
+            box-shadow:0 1px 4px rgba(0,0,0,.06); }
+    .card-title { font-size:.75rem; font-weight:700; color:#64748b; text-transform:uppercase;
+                  letter-spacing:.06em; margin-bottom:.75rem; }
 
     /* Table */
     .res-table { width:100%; border-collapse:collapse; font-size:.82rem; }
-    .res-table th { background:#0f172a; color:#94a3b8; font-weight:600; padding:.4rem .6rem;
-                    text-align:left; border-bottom:1px solid #334155; }
-    .res-table td { padding:.35rem .6rem; border-bottom:1px solid #1e293b; }
+    .res-table th { background:#f8fafc; color:#64748b; font-weight:600; padding:.4rem .6rem;
+                    text-align:left; border-bottom:2px solid #e2e8f0; }
+    .res-table td { padding:.35rem .6rem; border-bottom:1px solid #f1f5f9; color:#334155; }
     .res-table tr:last-child td { border-bottom:none; }
-    .res-table tr:hover td { background:rgba(59,130,246,.05); }
+    .res-table tr:hover td { background:#f8fafc; }
 
     /* Status badges */
-    .ok { color:#22c55e; font-weight:700; }
-    .nok { color:#ef4444; font-weight:700; }
-    .warn { color:#f59e0b; font-weight:700; }
-
-    /* Section header inside panel */
-    .sec-hdr {
-      display:flex; align-items:center; justify-content:space-between;
-      padding:.5rem .75rem; background:#0f172a; border-radius:.375rem;
-      cursor:pointer; margin-bottom:.5rem; border:1px solid #334155;
-      user-select:none;
-    }
-    .sec-hdr:hover { border-color:#475569; }
-    .sec-hdr span { font-size:.8rem; font-weight:600; color:#cbd5e1; }
-    .sec-body { padding:.25rem 0 .5rem 0; }
-
-    /* Sidebar layout */
-    #sidebar {
-      width: var(--sidebar-w); min-width: var(--sidebar-w);
-      background:#0f172a; border-right:1px solid #1e293b;
-      height:calc(100vh - 56px); overflow-y:auto; position:sticky; top:56px;
-      padding:1rem;
-    }
-    #main-area {
-      flex:1; overflow-y:auto; height:calc(100vh - 56px);
-      padding:1rem; position:relative;
-    }
+    .ok  { background:#dcfce7; color:#15803d; font-weight:700; padding:1px 7px; border-radius:10px; font-size:.78rem; }
+    .nok { background:#fee2e2; color:#dc2626; font-weight:700; padding:1px 7px; border-radius:10px; font-size:.78rem; }
+    .warn{ background:#fef9c3; color:#a16207; font-weight:700; padding:1px 7px; border-radius:10px; font-size:.78rem; }
 
     /* Header */
-    #topbar { height:56px; background:#0f172a; border-bottom:1px solid #1e293b;
+    #topbar { height:56px; background:#fff; border-bottom:1px solid #e2e8f0;
                display:flex; align-items:center; padding:0 1.25rem;
                position:sticky; top:0; z-index:100; gap:1rem; }
 
+    /* Wizard */
+    #wizard-area { max-width:680px; margin:2rem auto; padding:0 1rem; }
+    .wizard-progress { display:flex; align-items:center; margin-bottom:2rem; }
+    .wz-step { display:flex; align-items:center; gap:.5rem; }
+    .wz-step-num { width:28px; height:28px; border-radius:50%; display:flex; align-items:center;
+                   justify-content:center; font-size:.8rem; font-weight:700; flex-shrink:0;
+                   transition:all .2s; }
+    .wz-step-num.done  { background:#2563eb; color:#fff; }
+    .wz-step-num.active{ background:#2563eb; color:#fff; box-shadow:0 0 0 3px rgba(37,99,235,.2); }
+    .wz-step-num.idle  { background:#e2e8f0; color:#94a3b8; }
+    .wz-step-label { font-size:.8rem; font-weight:600; }
+    .wz-step-label.active { color:#2563eb; }
+    .wz-step-label.idle   { color:#94a3b8; }
+    .wz-connector { flex:1; height:2px; margin:0 .5rem; }
+    .wz-connector.done { background:#2563eb; }
+    .wz-connector.idle { background:#e2e8f0; }
+    .wizard-step { display:none; }
+    .wizard-step.active { display:block; }
+    .wz-nav { display:flex; justify-content:space-between; align-items:center; margin-top:1.5rem; }
+
+    /* Main content */
+    #main-area { flex:1; overflow-y:auto; height:calc(100vh - 56px); padding:1rem; position:relative; }
+
+    /* Status strip */
+    #status-strip { padding:.5rem 1rem; display:flex; gap:1.5rem; align-items:center;
+                    border-radius:.5rem; margin-bottom:1rem; font-size:.82rem; }
+    #status-strip.stable   { background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; }
+    #status-strip.unstable { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; }
+
     /* Canvas */
-    canvas.techcanvas { background:#0f172a; border-radius:.5rem; display:block; max-width:100%; }
+    canvas.techcanvas { background:#f8fafc; border-radius:.5rem; display:block; max-width:100%; border:1px solid #e2e8f0; }
 
     /* Memorial */
     .mem-section { margin-bottom:1.5rem; }
-    .mem-section-title { font-size:.85rem; font-weight:700; color:#60a5fa; margin-bottom:.75rem;
-                         border-bottom:1px solid #1e293b; padding-bottom:.4rem; }
-    .mem-step { font-size:.8rem; margin-bottom:.5rem; padding:.5rem .75rem;
-                background:#0f172a; border-radius:.375rem; border-left:3px solid #334155; }
-    .mem-step .formula { color:#f1f5f9; font-family:monospace; font-size:.78rem; }
-    .mem-step .result { color:#22c55e; font-weight:600; margin-top:.2rem; font-size:.8rem; }
-    .mem-step .label { color:#94a3b8; font-size:.75rem; margin-bottom:.25rem; }
+    .mem-section-title { font-size:.85rem; font-weight:700; color:#1d4ed8; margin-bottom:.75rem;
+                         border-bottom:2px solid #eff6ff; padding-bottom:.4rem; }
+    .mem-step { font-size:.8rem; margin-bottom:.75rem; padding:.5rem .75rem;
+                background:#f8fafc; border-radius:.375rem; border-left:3px solid #cbd5e1; }
+    .mem-step .label  { color:#64748b; font-size:.75rem; margin-bottom:.3rem; font-weight:600; }
+    .mem-step .mem-formula { background:#eff6ff; border-radius:4px; padding:4px 8px;
+                             font-family:monospace; font-size:.78rem; color:#1e40af; margin:3px 0; }
+    .mem-step .mem-subst   { background:#f0fdf4; border-radius:4px; padding:4px 8px;
+                             font-family:monospace; font-size:.78rem; color:#166534; margin:3px 0; }
+    .mem-step .result { color:#15803d; font-weight:700; margin-top:.3rem; font-size:.8rem; }
 
     /* Responsive */
     @media (max-width:900px) {
-      :root { --sidebar-w:100%; }
-      #layout { flex-direction:column; }
-      #sidebar { height:auto; position:relative; top:0; }
+      #wizard-area { margin:1rem auto; }
       #main-area { height:auto; }
-    }
-
-    /* Print / PDF */
-    @media print {
-      #topbar, #sidebar { display:none !important; }
-      #main-area { height:auto; overflow:visible; }
     }
 
     /* Spinner */
     .spinner { display:inline-block; width:16px; height:16px;
-               border:2px solid rgba(255,255,255,.3); border-top-color:#fff;
+               border:2px solid rgba(37,99,235,.2); border-top-color:#2563eb;
                border-radius:50%; animation:spin .6s linear infinite; }
     @keyframes spin { to { transform:rotate(360deg); } }
 
     /* Notice */
-    .notice { padding:.75rem 1rem; border-radius:.5rem; font-size:.82rem; }
-    .notice-info { background:rgba(59,130,246,.15); border:1px solid rgba(59,130,246,.3); color:#93c5fd; }
-    .notice-warn { background:rgba(245,158,11,.1); border:1px solid rgba(245,158,11,.3); color:#fcd34d; }
+    .notice { padding:.6rem .9rem; border-radius:.5rem; font-size:.82rem; }
+    .notice-info { background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
+    .notice-warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
+
+    /* Section card group */
+    .sec-group { display:grid; grid-template-columns:1fr 1fr; gap:.5rem; }
+    @media (max-width:500px) { .sec-group { grid-template-columns:1fr; } }
   </style>
 </head>
 <body>
@@ -137,157 +141,135 @@
 <!-- ===== TOP BAR ===== -->
 <header id="topbar">
   <div style="display:flex;align-items:center;gap:.75rem;flex:1;">
-    <svg width="28" height="28" viewBox="0 0 28 28" fill="none">
-      <rect x="1" y="1" width="26" height="26" rx="5" fill="#1e293b" stroke="#3b82f6" stroke-width="1.5"/>
-      <rect x="5" y="8" width="6" height="15" rx="1" fill="#3b82f6"/>
-      <rect x="5" y="20" width="18" height="3" rx="1" fill="#60a5fa"/>
-      <path d="M11 11 L22 11 L22 20 L11 20" stroke="#94a3b8" stroke-width="1.2" fill="none" stroke-dasharray="2 1"/>
-    </svg>
+    <div style="width:32px;height:32px;background:#2563eb;border-radius:7px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+      <svg width="18" height="18" viewBox="0 0 28 28" fill="none">
+        <rect x="4" y="7" width="5" height="14" rx="1" fill="#fff"/>
+        <rect x="4" y="18" width="20" height="3" rx="1" fill="#93c5fd"/>
+        <path d="M9 10 L22 10 L22 18 L9 18" stroke="#bfdbfe" stroke-width="1.2" fill="none" stroke-dasharray="2 1"/>
+      </svg>
+    </div>
     <div>
-      <div style="font-weight:700;font-size:.95rem;line-height:1;">Muros de Contenção</div>
-      <div style="font-size:.68rem;color:#64748b;">Análise Geotécnica &amp; Estrutural · ACI 318 / Rankine / Coulomb</div>
+      <div style="font-weight:700;font-size:.95rem;line-height:1.2;color:#0f172a;">Muros de Contenção</div>
+      <div style="font-size:.68rem;color:#94a3b8;">Análise Geotécnica &amp; Estrutural · ACI 318 / Rankine / Coulomb</div>
     </div>
   </div>
-  <button onclick="loadDefaults()" class="tab-btn" style="background:#1e293b;color:#94a3b8;border:1px solid #334155;">
-    Carregar Padrões
+  <button onclick="loadDefaults()"
+    style="background:#f1f5f9;color:#475569;padding:.4rem .9rem;border-radius:.375rem;font-size:.82rem;font-weight:500;border:1px solid #e2e8f0;cursor:pointer;">
+    Padrões
   </button>
-  <button onclick="runCalculate()" id="btn-calc"
-    style="background:#3b82f6;color:#fff;padding:.4rem 1.1rem;border-radius:.375rem;font-size:.82rem;font-weight:600;border:none;cursor:pointer;display:flex;align-items:center;gap:.5rem;">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
-    Calcular
+  <button id="btn-edit" onclick="showWizard()" style="display:none;
+    background:#f1f5f9;color:#475569;padding:.4rem .9rem;border-radius:.375rem;font-size:.82rem;font-weight:500;border:1px solid #e2e8f0;cursor:pointer;">
+    ← Editar
   </button>
-  <button onclick="exportPDF()" id="btn-pdf"
-    style="background:#0f172a;color:#94a3b8;padding:.4rem 1rem;border-radius:.375rem;font-size:.82rem;font-weight:500;border:1px solid #334155;cursor:pointer;display:flex;align-items:center;gap:.5rem;">
-    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
-    PDF
+  <button onclick="exportWord()" id="btn-word" style="display:none;
+    background:#f1f5f9;color:#475569;padding:.4rem .9rem;border-radius:.375rem;font-size:.82rem;font-weight:500;border:1px solid #e2e8f0;cursor:pointer;display:none;align-items:center;gap:.4rem;">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+    ⬇ Word
   </button>
 </header>
 
 <!-- ===== MAIN LAYOUT ===== -->
-<div id="layout" style="display:flex;">
+<div id="layout">
 
-  <!-- ===== SIDEBAR: INPUTS ===== -->
-  <aside id="sidebar">
+  <!-- ===== WIZARD ===== -->
+  <div id="wizard-area" style="max-width:680px;margin:2rem auto;padding:0 1rem;">
+    <div class="wizard-progress">
+      <div class="wz-step"><div class="wz-step-num active" id="wz-num-1">1</div><span class="wz-step-label active" id="wz-lbl-1">Geometria</span></div>
+      <div class="wz-connector idle" id="wz-con-1"></div>
+      <div class="wz-step"><div class="wz-step-num idle" id="wz-num-2">2</div><span class="wz-step-label idle" id="wz-lbl-2">Solo</span></div>
+      <div class="wz-connector idle" id="wz-con-2"></div>
+      <div class="wz-step"><div class="wz-step-num idle" id="wz-num-3">3</div><span class="wz-step-label idle" id="wz-lbl-3">Materiais</span></div>
+      <div class="wz-connector idle" id="wz-con-3"></div>
+      <div class="wz-step"><div class="wz-step-num idle" id="wz-num-4">4</div><span class="wz-step-label idle" id="wz-lbl-4">Sísmico</span></div>
+    </div>
 
-    <!-- GEOMETRIA -->
-    <div class="card" style="margin-bottom:.75rem;">
-      <div class="sec-hdr" onclick="toggleSec(this)">
-        <span>📐 Geometria do Muro</span>
-        <svg id="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    <div class="wizard-step active card" id="wz-step-1">
+      <div class="card-title">📐 Geometria do Muro</div>
+      <div class="sec-group">
+        <div><label>H₂ — Altura da cortina (m)</label><input class="inp" id="H2" type="number" step="0.1" value="6.0"></div>
+        <div><label>B — Largura da base (m)</label><input class="inp" id="B" type="number" step="0.1" value="4.0"></div>
+        <div><label>D — Prof. de embutimento (m)</label><input class="inp" id="D" type="number" step="0.05" value="1.50"></div>
+        <div><label>tf — Espessura fundação (m)</label><input class="inp" id="tf" type="number" step="0.05" value="0.70"></div>
+        <div><label>t1 — Esp. base da cortina (m)</label><input class="inp" id="t1" type="number" step="0.05" value="0.70"></div>
+        <div><label>t2 — Esp. topo da cortina (m)</label><input class="inp" id="t2" type="number" step="0.05" value="0.50"></div>
+        <div><label>t3 — Projeção frontal (m)</label><input class="inp" id="t3" type="number" step="0.05" value="0.70"></div>
       </div>
-      <div class="sec-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-          <div><label>H₂ — Altura da cortina (m)</label><input class="inp" id="H2" type="number" step="0.1" value="6.0"></div>
-          <div><label>B — Largura da base (m)</label><input class="inp" id="B" type="number" step="0.1" value="4.0"></div>
-          <div><label>D — Prof. de embutimento (m)</label><input class="inp" id="D" type="number" step="0.05" value="1.50"></div>
-          <div><label>tf — Espessura fundação (m)</label><input class="inp" id="tf" type="number" step="0.05" value="0.70"></div>
-          <div><label>t1 — Esp. base da cortina (m)</label><input class="inp" id="t1" type="number" step="0.05" value="0.70"></div>
-          <div><label>t2 — Esp. topo da cortina (m)</label><input class="inp" id="t2" type="number" step="0.05" value="0.50"></div>
-          <div><label>t3 — Projeção frontal (m)</label><input class="inp" id="t3" type="number" step="0.05" value="0.70"></div>
-        </div>
-        <div style="margin-top:.5rem;" id="t4-display" class="notice notice-info">Calcanhar: calculado automaticamente</div>
+      <div style="margin-top:.75rem;" id="t4-display" class="notice notice-info">Calcanhar: calculado automaticamente</div>
+      <div class="wz-nav"><span></span>
+        <button onclick="showStep(2)" style="background:#2563eb;color:#fff;padding:.45rem 1.2rem;border-radius:.375rem;font-size:.82rem;font-weight:600;border:none;cursor:pointer;">Próximo: Solo →</button>
       </div>
     </div>
 
-    <!-- SOLO ATERRO -->
-    <div class="card" style="margin-bottom:.75rem;">
-      <div class="sec-hdr" onclick="toggleSec(this)">
-        <span>🏔️ Solo de Aterro</span>
-        <svg id="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    <div class="wizard-step card" id="wz-step-2">
+      <div class="card-title">🏔️ Solo de Aterro</div>
+      <div class="sec-group">
+        <div><label>γ₁ — Peso esp. (kN/m³)</label><input class="inp" id="gamma1" type="number" step="0.5" value="18.0"></div>
+        <div><label>φ₁ — Ângulo de atrito (°)</label><input class="inp" id="phi1" type="number" step="0.5" value="30.0"></div>
+        <div><label>c₁ — Coesão (kPa)</label><input class="inp" id="c1" type="number" step="0.5" value="0.0"></div>
+        <div><label>α — Inclinação aterro (°)</label><input class="inp" id="alpha" type="number" step="0.5" value="10.0"></div>
+        <div><label>q — Sobrecarga (kPa)</label><input class="inp" id="q_sur" type="number" step="1" value="10.0"></div>
+        <div><label>δ — Atrito muro-solo (°)</label><input class="inp" id="delta_ws" type="number" step="0.5" value="20.0"></div>
       </div>
-      <div class="sec-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-          <div><label>γ₁ — Peso esp. (kN/m³)</label><input class="inp" id="gamma1" type="number" step="0.5" value="18.0"></div>
-          <div><label>φ₁ — Ângulo de atrito (°)</label><input class="inp" id="phi1" type="number" step="0.5" value="30.0"></div>
-          <div><label>c₁ — Coesão (kPa)</label><input class="inp" id="c1" type="number" step="0.5" value="0.0"></div>
-          <div><label>α — Inclinação aterro (°)</label><input class="inp" id="alpha" type="number" step="0.5" value="10.0"></div>
-          <div><label>q — Sobrecarga (kPa)</label><input class="inp" id="q_sur" type="number" step="1" value="10.0"></div>
-          <div><label>δ — Atrito muro-solo (°)</label><input class="inp" id="delta_ws" type="number" step="0.5" value="20.0"></div>
-        </div>
+      <div class="card-title" style="margin-top:1rem;">🪨 Solo de Fundação</div>
+      <div class="sec-group">
+        <div><label>γ₂ — Peso esp. (kN/m³)</label><input class="inp" id="gamma2" type="number" step="0.5" value="19.0"></div>
+        <div><label>φ₂ — Ângulo de atrito (°)</label><input class="inp" id="phi2" type="number" step="0.5" value="20.0"></div>
+        <div><label>c₂ — Coesão (kPa)</label><input class="inp" id="c2" type="number" step="0.5" value="40.0"></div>
       </div>
-    </div>
-
-    <!-- SOLO FUNDAÇÃO -->
-    <div class="card" style="margin-bottom:.75rem;">
-      <div class="sec-hdr" onclick="toggleSec(this)">
-        <span>🪨 Solo de Fundação</span>
-        <svg id="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
-      </div>
-      <div class="sec-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-          <div><label>γ₂ — Peso esp. (kN/m³)</label><input class="inp" id="gamma2" type="number" step="0.5" value="19.0"></div>
-          <div><label>φ₂ — Ângulo de atrito (°)</label><input class="inp" id="phi2" type="number" step="0.5" value="20.0"></div>
-          <div><label>c₂ — Coesão (kPa)</label><input class="inp" id="c2" type="number" step="0.5" value="40.0"></div>
-        </div>
+      <div class="wz-nav">
+        <button onclick="showStep(1)" style="background:#f1f5f9;color:#475569;padding:.45rem 1.2rem;border-radius:.375rem;font-size:.82rem;border:1px solid #e2e8f0;cursor:pointer;">← Geometria</button>
+        <button onclick="showStep(3)" style="background:#2563eb;color:#fff;padding:.45rem 1.2rem;border-radius:.375rem;font-size:.82rem;font-weight:600;border:none;cursor:pointer;">Próximo: Materiais →</button>
       </div>
     </div>
 
-    <!-- MATERIAIS -->
-    <div class="card" style="margin-bottom:.75rem;">
-      <div class="sec-hdr" onclick="toggleSec(this)">
-        <span>🏗️ Materiais</span>
-        <svg id="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    <div class="wizard-step card" id="wz-step-3">
+      <div class="card-title">🏗️ Materiais</div>
+      <div class="sec-group">
+        <div><label>f'c — Resist. concreto (MPa)</label><input class="inp" id="fc" type="number" step="1" value="21"></div>
+        <div><label>fy — Escoamento aço (MPa)</label><input class="inp" id="fy" type="number" step="10" value="420"></div>
+        <div><label>γc — Peso concreto (kN/m³)</label><input class="inp" id="gammac" type="number" step="0.01" value="23.58"></div>
+        <div><label>Cobrimento (m)</label><input class="inp" id="cover" type="number" step="0.005" value="0.075"></div>
       </div>
-      <div class="sec-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-          <div><label>f'c — Resist. concreto (MPa)</label><input class="inp" id="fc" type="number" step="1" value="21"></div>
-          <div><label>fy — Escoamento aço (MPa)</label><input class="inp" id="fy" type="number" step="10" value="420"></div>
-          <div><label>γc — Peso concreto (kN/m³)</label><input class="inp" id="gammac" type="number" step="0.01" value="23.58"></div>
-          <div><label>Cobrimento (m)</label><input class="inp" id="cover" type="number" step="0.005" value="0.075"></div>
-        </div>
+      <div class="wz-nav">
+        <button onclick="showStep(2)" style="background:#f1f5f9;color:#475569;padding:.45rem 1.2rem;border-radius:.375rem;font-size:.82rem;border:1px solid #e2e8f0;cursor:pointer;">← Solo</button>
+        <button onclick="showStep(4)" style="background:#2563eb;color:#fff;padding:.45rem 1.2rem;border-radius:.375rem;font-size:.82rem;font-weight:600;border:none;cursor:pointer;">Próximo: Sísmico →</button>
       </div>
     </div>
 
-    <!-- SÍSMICO -->
-    <div class="card" style="margin-bottom:.75rem;">
-      <div class="sec-hdr" onclick="toggleSec(this)">
-        <span>🌍 Parâmetros Sísmicos</span>
-        <svg id="arr" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#64748b" stroke-width="2"><polyline points="6 9 12 15 18 9"/></svg>
+    <div class="wizard-step card" id="wz-step-4">
+      <div class="card-title">🌍 Parâmetros Sísmicos</div>
+      <div class="sec-group">
+        <div><label>Kh — Coef. horizontal</label><input class="inp" id="Kh" type="number" step="0.01" value="0.15"></div>
+        <div><label>Kv — Coef. vertical</label><input class="inp" id="Kv" type="number" step="0.01" value="0.0"></div>
       </div>
-      <div class="sec-body">
-        <div style="display:grid;grid-template-columns:1fr 1fr;gap:.5rem;">
-          <div><label>Kh — Coef. horizontal</label><input class="inp" id="Kh" type="number" step="0.01" value="0.15"></div>
-          <div><label>Kv — Coef. vertical</label><input class="inp" id="Kv" type="number" step="0.01" value="0.0"></div>
-        </div>
-        <div style="margin-top:.5rem;" class="notice notice-info">Kh = 0 → apenas análise estática</div>
-      </div>
-    </div>
-
-    <button onclick="runCalculate()"
-      style="width:100%;background:#3b82f6;color:#fff;padding:.6rem;border-radius:.5rem;font-size:.9rem;font-weight:700;border:none;cursor:pointer;margin-top:.25rem;">
-      CALCULAR
-    </button>
-  </aside>
-
-  <!-- ===== MAIN CONTENT ===== -->
-  <main id="main-area">
-
-    <!-- Welcome / no-calc state -->
-    <div id="welcome-state">
-      <div style="max-width:560px;margin:3rem auto;text-align:center;">
-        <div style="font-size:3rem;margin-bottom:1rem;">🧱</div>
-        <h2 style="font-size:1.3rem;font-weight:700;margin-bottom:.75rem;">Calculadora de Muros de Contenção</h2>
-        <p style="color:#64748b;font-size:.9rem;margin-bottom:1.5rem;">
-          Preencha os parâmetros no painel à esquerda e clique <strong>Calcular</strong> para obter
-          a análise completa (Rankine · Coulomb · Mononobe-Okabe · ACI 318 · FEM).
-        </p>
-        <button onclick="loadDefaults();runCalculate();"
-          style="background:#3b82f6;color:#fff;padding:.6rem 1.5rem;border-radius:.5rem;font-weight:700;border:none;cursor:pointer;font-size:.9rem;">
-          Executar com Valores Padrão
+      <div style="margin-top:.75rem;" class="notice notice-info">Kh = 0 → apenas análise estática</div>
+      <div class="wz-nav">
+        <button onclick="showStep(3)" style="background:#f1f5f9;color:#475569;padding:.45rem 1.2rem;border-radius:.375rem;font-size:.82rem;border:1px solid #e2e8f0;cursor:pointer;">← Materiais</button>
+        <button onclick="runCalculate()" id="btn-calc"
+          style="background:#2563eb;color:#fff;padding:.45rem 1.5rem;border-radius:.375rem;font-size:.9rem;font-weight:700;border:none;cursor:pointer;display:flex;align-items:center;gap:.5rem;">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 11 12 14 22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+          ✓ Calcular
         </button>
       </div>
     </div>
+  </div>
 
-    <!-- Results (hidden until calc) -->
-    <div id="results-state" style="display:none;">
+  <!-- ===== MAIN CONTENT ===== -->
+  <main id="main-area" style="display:none;">
+
+    <!-- Results -->
+    <div id="results-state">
+
+      <!-- Status strip -->
+      <div id="status-strip" class="stable" style="display:none;margin-bottom:.75rem;"></div>
 
       <!-- Tabs -->
-      <div style="display:flex;gap:.35rem;margin-bottom:1rem;flex-wrap:wrap;overflow-x:auto;padding-bottom:.25rem;">
-        <button class="tab-btn active" data-tab="tab-geo">Análise Geotécnica</button>
-        <button class="tab-btn" data-tab="tab-struct">Análise Estrutural</button>
-        <button class="tab-btn" data-tab="tab-fem">Análise FEM</button>
+      <div style="display:flex;gap:0;margin-bottom:1rem;border-bottom:2px solid #e2e8f0;overflow-x:auto;">
+        <button class="tab-btn active" data-tab="tab-geo">Geotécnica</button>
+        <button class="tab-btn" data-tab="tab-struct">Estrutural</button>
+        <button class="tab-btn" data-tab="tab-fem">FEM</button>
         <button class="tab-btn" data-tab="tab-vis">Visualização</button>
-        <button class="tab-btn" data-tab="tab-mem">Memorial de Cálculo</button>
+        <button class="tab-btn" data-tab="tab-mem">Memorial</button>
       </div>
 
       <!-- ===== TAB: GEOTÉCNICA ===== -->
@@ -395,9 +377,9 @@
         <div class="card" style="margin-bottom:1rem;">
           <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:.75rem;">
             <div class="card-title" style="margin-bottom:0;">Memorial de Cálculo Detalhado</div>
-            <button onclick="exportPDF()"
+            <button onclick="exportWord()"
               style="background:#3b82f6;color:#fff;padding:.35rem .9rem;border-radius:.375rem;font-size:.78rem;font-weight:600;border:none;cursor:pointer;">
-              Exportar PDF
+              ⬇ Exportar Word
             </button>
           </div>
           <div id="memorial-content"></div>
@@ -408,10 +390,6 @@
   </main>
 </div>
 
-<!-- ===== PDF PRINT AREA (hidden) ===== -->
-<div id="pdf-area" style="display:none;background:#fff;color:#000;padding:2rem;font-family:'Segoe UI',sans-serif;font-size:11pt;">
-  <div id="pdf-content"></div>
-</div>
 
 <script>
 // ============================================================
@@ -423,16 +401,32 @@ const fmt = (v, d=3) => isFinite(v) && !isNaN(v) ? (+v).toFixed(d) : (v === Infi
 const fmt2 = v => fmt(v, 2);
 const fmt4 = v => fmt(v, 4);
 
-function toggleSec(hdr) {
-  const body = hdr.nextElementSibling;
-  const arr  = hdr.querySelector('svg');
-  if (body.style.display === 'none') {
-    body.style.display = '';
-    arr.style.transform = '';
-  } else {
-    body.style.display = 'none';
-    arr.style.transform = 'rotate(-90deg)';
+let _wzCurrent = 1;
+function showStep(n) {
+  for (let i = 1; i <= 4; i++) {
+    const step = document.getElementById('wz-step-' + i);
+    if (step) step.style.display = (i === n) ? 'block' : 'none';
+    const num = document.getElementById('wz-num-' + i);
+    if (num) num.className = 'wz-step-num ' + (i < n ? 'done' : i === n ? 'active' : 'idle');
+    const lbl = document.getElementById('wz-lbl-' + i);
+    if (lbl) lbl.className = 'wz-step-label ' + (i === n ? 'active' : 'idle');
+    const con = document.getElementById('wz-con-' + i);
+    if (con) con.className = 'wz-connector ' + (i < n ? 'done' : 'idle');
   }
+  _wzCurrent = n;
+}
+function showWizard() {
+  document.getElementById('wizard-area').style.display = 'block';
+  document.getElementById('main-area').style.display = 'none';
+  document.getElementById('btn-edit').style.display = 'none';
+  document.getElementById('btn-word').style.display = 'none';
+  showStep(_wzCurrent);
+}
+function showResults() {
+  document.getElementById('wizard-area').style.display = 'none';
+  document.getElementById('main-area').style.display = 'block';
+  document.getElementById('btn-edit').style.display = 'inline-flex';
+  document.getElementById('btn-word').style.display = 'inline-flex';
 }
 
 function getParams() {
@@ -776,12 +770,13 @@ function calcStructural(p, stab_C, act_C, Ka_direct) {
 // Referência: Edwin Alarcón — muros_de_contencion
 // ============================================================
 function calcFEM(p, stab_C, act_C, Ka_direct) {
-  // ── Parâmetros de malha ─────────────────────────────────────
-  const NY_STEM = 10, NX_STEM = 4;
-  const NY_FOOT = 3;
-  const elem_w  = p.t1 / NX_STEM; // tamanho de referência (~0.175 m)
-  const NX_TOE  = Math.max(2, Math.min(6,  Math.round(p.t3 / elem_w)));
-  const NX_HEEL = Math.max(3, Math.min(12, Math.round(p.t4 / elem_w)));
+  // ── Parâmetros de malha (adaptativa, igual ao modelo Edwin mesh_p=6.0) ──
+  const mesh_p  = 6.0;
+  const NY_STEM = Math.max(2, Math.floor(p.H2 * mesh_p) + 1);
+  const NX_STEM = Math.max(2, Math.floor(p.t1 * mesh_p) + 1);
+  const NY_FOOT = Math.max(2, Math.floor(p.tf * mesh_p) + 1);
+  const NX_TOE  = Math.max(2, Math.floor(p.t3 * mesh_p) + 1);
+  const NX_HEEL = Math.max(2, Math.floor(p.t4 * mesh_p) + 1);
 
   // ── Material ────────────────────────────────────────────────
   const E  = 4700 * Math.sqrt(p.fc) * 1000; // kPa  (Ec = 4700√f'c MPa)
@@ -917,12 +912,13 @@ function calcFEM(p, stab_C, act_C, Ka_direct) {
                  Math.abs(n.x - xFace(n.y)) < 1e-3)
     .sort((a, b) => a.y - b.y);
   const pLat = y => Ka * (p.q + p.gamma1 * Math.max(0, p.H2 - y)); // kPa
-  for (let i = 0; i < faceDireita.length-1; i++) {
-    const na=faceDireita[i], nb=faceDireita[i+1];
-    const pa=pLat(na.y), pb=pLat(nb.y);
-    const h = nb.y - na.y;
-    F[2*na.id] -= (2*pa + pb)/6 * h; // força em −x (kN/m por metro de largura)
-    F[2*nb.id] -= (pa + 2*pb)/6 * h;
+  // Distribuição proporcional à pressão em cada nó (igual ao Edwin)
+  const totalForce = Ka * (p.q * p.H2 + 0.5 * p.gamma1 * p.H2 ** 2);
+  const totalPressWeight = faceDireita.reduce((s, n) => s + pLat(n.y), 0);
+  if (totalPressWeight > 0) {
+    faceDireita.forEach(n => {
+      F[2 * n.id] -= totalForce * (pLat(n.y) / totalPressWeight);
+    });
   }
 
   // ── Condições de contorno: fixar x de um nó central da base ──
@@ -1124,10 +1120,20 @@ function generateMemorial(p, Ka_R, Ka_C, Ka_MO, act_R, act_C, stab_R, stab_C, st
     ['Fundação — Calcanhar', struct.heel_sec]
   ];
   for (const [name, s] of sects) {
-    add(`${name} — Mu`, `Mu = 1.6 × Ma`, fmt2(s.Mu), 'kN·m/m');
-    add(`${name} — d efetivo`, `d = espessura − cobrimento − Ø/2`, fmt(s.d), 'm');
-    add(`${name} — As requerida`, `Rn → ρ → As = ρ·b·d`, fmt2(s.As_cm2), 'cm²/m');
-    add(`${name} — As mínima ACI`, `As_min = max(0.7√f\'c, 1.4)/fy × b·d`, fmt2(s.As_min_cm2), 'cm²/m');
+    const Ma = s.Mu / 1.6;
+    add(`${name} — Mu`,
+      `Mu = 1.6 × Ma = 1.6 × ${fmt2(Ma)}`, fmt2(s.Mu), 'kN·m/m');
+    add(`${name} — d efetivo`,
+      `d = espessura − cobrimento − Ø/2 = ${fmt(s.d)}`, fmt(s.d), 'm');
+    const Rn = Math.abs(s.Mu) / (0.9 * s.d * s.d * 1000);
+    const ratio = 2 * Rn / (0.85 * p.fc);
+    const rho_min = Math.max(0.7 * Math.sqrt(p.fc), 1.4) / p.fy;
+    add(`${name} — As requerida`,
+      `Rn = Mu/(φ·b·d²) = ${fmt2(Math.abs(s.Mu))}/(0.9×1×${fmt(s.d)}²×1000) = ${fmt2(Rn)} MPa → ρ = ${fmt4(s.rho)} → As = ρ·b·d = ${fmt4(s.rho)}×100×${fmt(s.d)}×100`,
+      fmt2(s.As_cm2), 'cm²/m');
+    add(`${name} — As mínima ACI`,
+      `As_min = max(0.7√${p.fc}, 1.4)/${p.fy}×b·d = ${fmt4(rho_min)}×100×${fmt(s.d)}×100`,
+      fmt2(s.As_min_cm2), 'cm²/m');
     add(`${name} — Armadura adotada`, `${s.bar.desc}`, fmt2(s.bar.As), 'cm²/m');
   }
 
@@ -1190,8 +1196,19 @@ function runCalculate() {
 
       renderResults(lastResults);
 
-      document.getElementById('welcome-state').style.display = 'none';
-      document.getElementById('results-state').style.display = 'block';
+      // Status strip
+      const allOk = stab_C.vol_ok && stab_C.desl_ok && stab_C.cap_ok;
+      const strip = document.getElementById('status-strip');
+      strip.className = allOk ? 'stable' : 'unstable';
+      strip.style.display = 'flex';
+      strip.innerHTML = `
+        <strong>${allOk ? '✓ ESTÁVEL' : '✗ INSTÁVEL'}</strong>
+        <span>Tombamento: <strong>${fmt2(stab_C.FS_vol)}</strong> ${stab_C.vol_ok ? '✓' : '✗'}</span>
+        <span>Deslizamento: <strong>${fmt2(stab_C.FS_desl)}</strong> ${stab_C.desl_ok ? '✓' : '✗'}</span>
+        <span>Cap. Carga: <strong>${fmt2(stab_C.FS_cap)}</strong> ${stab_C.cap_ok ? '✓' : '✗'}</span>
+      `;
+
+      showResults();
     } catch(e) {
       console.error(e);
       alert('Erro no cálculo: ' + e.message);
@@ -1223,11 +1240,11 @@ function renderStabilityTable(stab, el_id) {
       </tbody>
     </table>
     <div style="margin-top:.75rem;font-size:.8rem;color:#94a3b8;display:grid;grid-template-columns:1fr 1fr;gap:.35rem;">
-      <div>e = <strong style="color:#e2e8f0;">${fmt2(e)} m</strong> ${e_ok?'<span class="ok">✓</span>':'<span class="nok">✗</span>'}</div>
-      <div>B\' = <strong style="color:#e2e8f0;">${fmt2(B_eff)} m</strong></div>
-      <div>q_ponta = <strong style="color:#e2e8f0;">${fmt2(q_toe)} kPa</strong></div>
-      <div>q_calc. = <strong style="color:#e2e8f0;">${fmt2(q_heel)} kPa</strong></div>
-      <div>qu = <strong style="color:#e2e8f0;">${fmt2(qu)} kPa</strong></div>
+      <div>e = <strong style="color:#0f172a;">${fmt2(e)} m</strong> ${e_ok?'<span class="ok">✓</span>':'<span class="nok">✗</span>'}</div>
+      <div>B\' = <strong style="color:#0f172a;">${fmt2(B_eff)} m</strong></div>
+      <div>q_ponta = <strong style="color:#0f172a;">${fmt2(q_toe)} kPa</strong></div>
+      <div>q_calc. = <strong style="color:#0f172a;">${fmt2(q_heel)} kPa</strong></div>
+      <div>qu = <strong style="color:#0f172a;">${fmt2(qu)} kPa</strong></div>
     </div>
   `;
   document.getElementById(el_id).innerHTML = html;
@@ -1686,8 +1703,7 @@ function renderMemorial(steps) {
       html += `
         <div class="mem-step">
           <div class="label">${s.label}</div>
-          <div class="formula">${s.formula}</div>
-          <div class="result">= ${s.result} ${s.unit||''}</div>
+          <div class="mem-subst">${s.formula} = <strong>${s.result}${s.unit ? ' ' + s.unit : ''}</strong></div>
         </div>`;
     }
   }
@@ -1696,95 +1712,140 @@ function renderMemorial(steps) {
 }
 
 // ============================================================
-// PDF EXPORT
+// WORD EXPORT
 // ============================================================
-function exportPDF() {
+async function exportWord() {
   if (!lastResults) { alert('Execute o cálculo primeiro.'); return; }
-  const btn = document.getElementById('btn-pdf');
-  btn.innerHTML = '<span class="spinner"></span>';
-  btn.disabled = true;
+  if (typeof docx === 'undefined') { alert('Biblioteca docx não carregada. Verifique a conexão.'); return; }
 
   const r = lastResults;
   const p = r.p;
   const date = new Date().toLocaleDateString('pt-BR');
+  const { Document, Packer, Paragraph, TextRun, Table, TableRow, TableCell,
+          HeadingLevel, AlignmentType, WidthType, BorderStyle } = docx;
 
-  const pdfDiv = document.getElementById('pdf-area');
-  pdfDiv.style.display = 'block';
-
-  document.getElementById('pdf-content').innerHTML = `
-    <div style="text-align:center;border-bottom:2px solid #1e40af;padding-bottom:1rem;margin-bottom:1.5rem;">
-      <h1 style="font-size:18pt;color:#1e3a8a;margin:0;">MEMORIAL DE CÁLCULO</h1>
-      <h2 style="font-size:14pt;color:#1e40af;margin:.5rem 0;">Muro de Contenção em Concreto Armado</h2>
-      <p style="color:#475569;margin:0;font-size:10pt;">Data: ${date} — Norma: ACI 318 / ASCE</p>
-    </div>
-
-    <h3 style="color:#1e3a8a;font-size:12pt;border-bottom:1px solid #dbeafe;padding-bottom:.3rem;">Dados do Projeto</h3>
-    <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:1rem;">
-      <tr style="background:#eff6ff;">
-        <td style="padding:.3rem .5rem;"><b>H₂ (cortina)</b></td><td>${fmt(p.H2)} m</td>
-        <td><b>B (base)</b></td><td>${fmt(p.B)} m</td>
-        <td><b>D (embutimento)</b></td><td>${fmt(p.D)} m</td>
-      </tr>
-      <tr>
-        <td style="padding:.3rem .5rem;"><b>γ₁ (aterro)</b></td><td>${p.gamma1} kN/m³</td>
-        <td><b>φ₁</b></td><td>${p.phi1}°</td>
-        <td><b>α (inclinação)</b></td><td>${p.alpha}°</td>
-      </tr>
-      <tr style="background:#eff6ff;">
-        <td style="padding:.3rem .5rem;"><b>γ₂ (fundação)</b></td><td>${p.gamma2} kN/m³</td>
-        <td><b>φ₂</b></td><td>${p.phi2}°</td>
-        <td><b>c₂</b></td><td>${p.c2} kPa</td>
-      </tr>
-      <tr>
-        <td style="padding:.3rem .5rem;"><b>f'c</b></td><td>${p.fc} MPa</td>
-        <td><b>fy</b></td><td>${p.fy} MPa</td>
-        <td><b>Kh</b></td><td>${p.Kh}</td>
-      </tr>
-    </table>
-
-    <h3 style="color:#1e3a8a;font-size:12pt;border-bottom:1px solid #dbeafe;padding-bottom:.3rem;">Coeficientes de Empuxo</h3>
-    <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:1rem;">
-      <tr style="background:#1e3a8a;color:#fff;"><th style="padding:.3rem;">Método</th><th>Ka</th><th>Ph (kN/m)</th><th>Mh (kN·m/m)</th></tr>
-      <tr style="background:#eff6ff;"><td style="padding:.3rem;text-align:center;">Rankine</td><td style="text-align:center;">${fmt4(r.Ka_R)}</td><td style="text-align:center;">${fmt2(r.act_R.Ph)}</td><td style="text-align:center;">${fmt2(r.act_R.Mh)}</td></tr>
-      <tr><td style="padding:.3rem;text-align:center;">Coulomb</td><td style="text-align:center;">${fmt4(r.Ka_C)}</td><td style="text-align:center;">${fmt2(r.act_C.Ph)}</td><td style="text-align:center;">${fmt2(r.act_C.Mh)}</td></tr>
-      ${r.Ka_MO ? `<tr style="background:#fef2f2;"><td style="padding:.3rem;text-align:center;">Mononobe-Okabe</td><td style="text-align:center;">${fmt4(r.Ka_MO)}</td><td style="text-align:center;">${fmt2(r.act_MO.Ph)}</td><td style="text-align:center;">${fmt2(r.act_MO.Mh)}</td></tr>` : ''}
-    </table>
-
-    <h3 style="color:#1e3a8a;font-size:12pt;border-bottom:1px solid #dbeafe;padding-bottom:.3rem;">Verificações de Estabilidade (Coulomb)</h3>
-    <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:1rem;">
-      <tr style="background:#1e3a8a;color:#fff;"><th style="padding:.3rem;">Verificação</th><th>FS Calc.</th><th>FS Mín.</th><th>Resultado</th></tr>
-      <tr style="background:#eff6ff;"><td style="padding:.3rem;">Tombamento</td><td style="text-align:center;">${fmt2(r.stab_C.FS_vol)}</td><td style="text-align:center;">1.5</td><td style="text-align:center;color:${r.stab_C.vol_ok?'green':'red'};">${r.stab_C.vol_ok?'VERIFICA':'NÃO VERIFICA'}</td></tr>
-      <tr><td style="padding:.3rem;">Deslizamento</td><td style="text-align:center;">${fmt2(r.stab_C.FS_desl)}</td><td style="text-align:center;">1.5</td><td style="text-align:center;color:${r.stab_C.desl_ok?'green':'red'};">${r.stab_C.desl_ok?'VERIFICA':'NÃO VERIFICA'}</td></tr>
-      <tr style="background:#eff6ff;"><td style="padding:.3rem;">Cap. de Carga</td><td style="text-align:center;">${fmt2(r.stab_C.FS_cap)}</td><td style="text-align:center;">3.0</td><td style="text-align:center;color:${r.stab_C.cap_ok?'green':'red'};">${r.stab_C.cap_ok?'VERIFICA':'NÃO VERIFICA'}</td></tr>
-    </table>
-
-    <h3 style="color:#1e3a8a;font-size:12pt;border-bottom:1px solid #dbeafe;padding-bottom:.3rem;">Dimensionamento Estrutural (ACI 318)</h3>
-    <table style="width:100%;border-collapse:collapse;font-size:9pt;margin-bottom:1rem;">
-      <tr style="background:#1e3a8a;color:#fff;"><th style="padding:.3rem;">Seção</th><th>Mu (kN·m/m)</th><th>As req. (cm²/m)</th><th>Armadura</th></tr>
-      <tr style="background:#eff6ff;"><td style="padding:.3rem;">Cortina — Base</td><td style="text-align:center;">${fmt2(r.struct.stem_base.Mu)}</td><td style="text-align:center;">${fmt2(r.struct.stem_base.As_adot)}</td><td style="text-align:center;">${r.struct.stem_base.bar.desc}</td></tr>
-      <tr><td style="padding:.3rem;">Cortina — Meio</td><td style="text-align:center;">${fmt2(r.struct.stem_mid.Mu)}</td><td style="text-align:center;">${fmt2(r.struct.stem_mid.As_adot)}</td><td style="text-align:center;">${r.struct.stem_mid.bar.desc}</td></tr>
-      <tr style="background:#eff6ff;"><td style="padding:.3rem;">Fundação — Ponta</td><td style="text-align:center;">${fmt2(r.struct.toe_sec.Mu)}</td><td style="text-align:center;">${fmt2(r.struct.toe_sec.As_adot)}</td><td style="text-align:center;">${r.struct.toe_sec.bar.desc}</td></tr>
-      <tr><td style="padding:.3rem;">Fundação — Calcanhar</td><td style="text-align:center;">${fmt2(r.struct.heel_sec.Mu)}</td><td style="text-align:center;">${fmt2(r.struct.heel_sec.As_adot)}</td><td style="text-align:center;">${r.struct.heel_sec.bar.desc}</td></tr>
-    </table>
-
-    <div style="margin-top:2rem;padding-top:1rem;border-top:1px solid #dbeafe;font-size:8pt;color:#94a3b8;text-align:center;">
-      Calculadora de Muros de Contenção — Análise por Rankine / Coulomb / Mononobe-Okabe · ACI 318 · FEM
-    </div>
-  `;
-
-  const opt = {
-    margin: [10, 10],
-    filename: `muro_de_contencao_${date.replace(/\//g,'-')}.pdf`,
-    image: { type: 'jpeg', quality: 0.98 },
-    html2canvas: { scale: 2, useCORS: true },
-    jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' }
-  };
-
-  html2pdf().set(opt).from(pdfDiv).save().then(() => {
-    pdfDiv.style.display = 'none';
-    btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg> PDF`;
-    btn.disabled = false;
+  const heading = (text) => new Paragraph({
+    text,
+    heading: HeadingLevel.HEADING_2,
+    spacing: { before: 240, after: 120 }
   });
+
+  const para = (runs) => new Paragraph({ children: runs, spacing: { after: 80 } });
+
+  const bold = (text) => new TextRun({ text, bold: true, size: 20 });
+  const normal = (text) => new TextRun({ text, size: 20 });
+
+  const tableRow = (cells, isHeader=false) => new TableRow({
+    children: cells.map(c => new TableCell({
+      children: [new Paragraph({ children: [new TextRun({ text: String(c), bold: isHeader, size: 18 })] })],
+      margins: { top: 60, bottom: 60, left: 80, right: 80 }
+    }))
+  });
+
+  const makeTable = (headers, rows) => new Table({
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    rows: [tableRow(headers, true), ...rows.map(r => tableRow(r))]
+  });
+
+  // Build memorial paragraphs
+  const memParas = [];
+  for (const s of r.memorial) {
+    if (s.section) {
+      memParas.push(new Paragraph({
+        children: [new TextRun({ text: s.section, bold: true, size: 22, color: '1D4ED8' })],
+        spacing: { before: 200, after: 80 },
+        border: { bottom: { style: BorderStyle.SINGLE, size: 4, color: 'BFDBFE' } }
+      }));
+    } else {
+      memParas.push(para([bold(s.label + ': '), normal(s.formula + ' = '), bold(s.result + (s.unit ? ' ' + s.unit : ''))]));
+    }
+  }
+
+  const doc = new Document({
+    sections: [{
+      properties: { page: { margin: { top: 720, bottom: 720, left: 900, right: 900 } } },
+      children: [
+        new Paragraph({
+          children: [new TextRun({ text: 'MEMORIAL DE CÁLCULO', bold: true, size: 32, color: '1E3A8A' })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 120 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: 'Muro de Contenção em Concreto Armado', size: 24, color: '1E40AF' })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 80 }
+        }),
+        new Paragraph({
+          children: [new TextRun({ text: `Data: ${date}  —  Norma: ACI 318 / ASCE`, size: 18, color: '64748B' })],
+          alignment: AlignmentType.CENTER,
+          spacing: { after: 320 }
+        }),
+
+        heading('Dados de Entrada'),
+        makeTable(
+          ['Parâmetro', 'Valor', 'Parâmetro', 'Valor'],
+          [
+            ['H₂ (cortina)', `${fmt(p.H2)} m`, 'B (base)', `${fmt(p.B)} m`],
+            ['D (embutimento)', `${fmt(p.D)} m`, 'tf (fundação)', `${fmt(p.tf)} m`],
+            ['γ₁ (aterro)', `${p.gamma1} kN/m³`, 'φ₁', `${p.phi1}°`],
+            ['α (inclinação)', `${p.alpha}°`, 'q (sobrecarga)', `${p.q} kPa`],
+            ['γ₂ (fundação)', `${p.gamma2} kN/m³`, 'φ₂', `${p.phi2}°`],
+            ['c₂', `${p.c2} kPa`, "f'c", `${p.fc} MPa`],
+            ['fy', `${p.fy} MPa`, 'Kh', `${p.Kh}`],
+          ]
+        ),
+
+        heading('Coeficientes de Empuxo Ativo'),
+        makeTable(
+          ['Método', 'Ka', 'Ph (kN/m)', 'Mh (kN·m/m)'],
+          [
+            ['Rankine', fmt4(r.Ka_R), fmt2(r.act_R.Ph), fmt2(r.act_R.Mh)],
+            ['Coulomb', fmt4(r.Ka_C), fmt2(r.act_C.Ph), fmt2(r.act_C.Mh)],
+            ...(r.Ka_MO ? [['Mononobe-Okabe', fmt4(r.Ka_MO), fmt2(r.act_MO.Ph), fmt2(r.act_MO.Mh)]] : [])
+          ]
+        ),
+
+        heading('Verificações de Estabilidade (Coulomb)'),
+        makeTable(
+          ['Verificação', 'FS Calculado', 'FS Mínimo', 'Resultado'],
+          [
+            ['Tombamento',      fmt2(r.stab_C.FS_vol),  '1.5', r.stab_C.vol_ok  ? 'VERIFICA' : 'NÃO VERIFICA'],
+            ['Deslizamento',    fmt2(r.stab_C.FS_desl), '1.5', r.stab_C.desl_ok ? 'VERIFICA' : 'NÃO VERIFICA'],
+            ['Cap. de Carga',   fmt2(r.stab_C.FS_cap),  '3.0', r.stab_C.cap_ok  ? 'VERIFICA' : 'NÃO VERIFICA'],
+          ]
+        ),
+
+        heading('Dimensionamento Estrutural (ACI 318)'),
+        makeTable(
+          ['Seção', 'Mu (kN·m/m)', 'As adot. (cm²/m)', 'Armadura'],
+          [
+            ['Cortina — Base',        fmt2(r.struct.stem_base.Mu),  fmt2(r.struct.stem_base.As_adot),  r.struct.stem_base.bar.desc],
+            ['Cortina — Meio',        fmt2(r.struct.stem_mid.Mu),   fmt2(r.struct.stem_mid.As_adot),   r.struct.stem_mid.bar.desc],
+            ['Fundação — Ponta',      fmt2(r.struct.toe_sec.Mu),    fmt2(r.struct.toe_sec.As_adot),    r.struct.toe_sec.bar.desc],
+            ['Fundação — Calcanhar',  fmt2(r.struct.heel_sec.Mu),   fmt2(r.struct.heel_sec.As_adot),   r.struct.heel_sec.bar.desc],
+          ]
+        ),
+
+        heading('Memorial de Cálculo Detalhado'),
+        ...memParas,
+
+        new Paragraph({
+          children: [new TextRun({ text: 'Gerado por Calculadora de Muros de Contenção — Rankine / Coulomb / Mononobe-Okabe · ACI 318 · FEM', size: 16, color: '94A3B8' })],
+          alignment: AlignmentType.CENTER,
+          spacing: { before: 480 },
+          border: { top: { style: BorderStyle.SINGLE, size: 4, color: 'E2E8F0' } }
+        })
+      ]
+    }]
+  });
+
+  const blob = await Packer.toBlob(doc);
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = `muro_de_contencao_${date.replace(/\//g,'-')}.docx`;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 // ============================================================
@@ -1825,6 +1886,7 @@ document.addEventListener('DOMContentLoaded', () => {
   });
 
   loadDefaults();
+  showStep(1);
 });
 </script>
 </body>
