@@ -6,7 +6,7 @@
   <title>Calculadora de Muros de Contenção</title>
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
-  <script src="https://cdn.jsdelivr.net/npm/docx@8/build/index.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/docx@8.5.0/build/index.js"></script>
   <script>
     tailwind.config = {
       theme: {
@@ -21,7 +21,7 @@
   <style>
     * { box-sizing: border-box; }
     html { scroll-behavior: smooth; }
-    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background:#f8fafc; color:#1e293b; margin:0; }
+    body { font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; background:#f8fafc; color:#1e293b; margin:0; font-size:0.95rem; }
 
     /* Scrollbars */
     ::-webkit-scrollbar { width:6px; height:6px; }
@@ -32,13 +32,13 @@
     .inp {
       width:100%; padding:0.35rem 0.5rem; border-radius:0.375rem;
       background:#f8fafc; border:1px solid #e2e8f0; color:#1e293b;
-      font-size:0.85rem; transition: border-color .15s;
+      font-size:0.94rem; transition: border-color .15s;
     }
     .inp:focus { outline:none; border-color:#2563eb; box-shadow:0 0 0 2px rgba(37,99,235,.15); }
-    label { font-size:0.78rem; color:#64748b; display:block; margin-bottom:2px; }
+    label { font-size:0.88rem; color:#64748b; display:block; margin-bottom:2px; }
 
     /* Tabs */
-    .tab-btn { padding:.5rem 1rem; font-size:.82rem; font-weight:500; border-bottom:2px solid transparent;
+    .tab-btn { padding:.5rem 1rem; font-size:.92rem; font-weight:500; border-bottom:2px solid transparent;
                color:#64748b; transition:all .15s; cursor:pointer; white-space:nowrap; background:none; border-left:none; border-right:none; border-top:none; }
     .tab-btn:hover { color:#1e293b; }
     .tab-btn.active { color:#2563eb; border-bottom-color:#2563eb; font-weight:600; }
@@ -48,11 +48,11 @@
     /* Cards */
     .card { background:#fff; border:1px solid #e2e8f0; border-radius:.625rem; padding:1rem;
             box-shadow:0 1px 4px rgba(0,0,0,.06); }
-    .card-title { font-size:.75rem; font-weight:700; color:#64748b; text-transform:uppercase;
+    .card-title { font-size:.85rem; font-weight:700; color:#64748b; text-transform:uppercase;
                   letter-spacing:.06em; margin-bottom:.75rem; }
 
     /* Table */
-    .res-table { width:100%; border-collapse:collapse; font-size:.82rem; }
+    .res-table { width:100%; border-collapse:collapse; font-size:.92rem; }
     .res-table th { background:#f8fafc; color:#64748b; font-weight:600; padding:.4rem .6rem;
                     text-align:left; border-bottom:2px solid #e2e8f0; }
     .res-table td { padding:.35rem .6rem; border-bottom:1px solid #f1f5f9; color:#334155; }
@@ -60,9 +60,9 @@
     .res-table tr:hover td { background:#f8fafc; }
 
     /* Status badges */
-    .ok  { background:#dcfce7; color:#15803d; font-weight:700; padding:1px 7px; border-radius:10px; font-size:.78rem; }
-    .nok { background:#fee2e2; color:#dc2626; font-weight:700; padding:1px 7px; border-radius:10px; font-size:.78rem; }
-    .warn{ background:#fef9c3; color:#a16207; font-weight:700; padding:1px 7px; border-radius:10px; font-size:.78rem; }
+    .ok  { background:#dcfce7; color:#15803d; font-weight:700; padding:1px 7px; border-radius:10px; font-size:.86rem; }
+    .nok { background:#fee2e2; color:#dc2626; font-weight:700; padding:1px 7px; border-radius:10px; font-size:.86rem; }
+    .warn{ background:#fef9c3; color:#a16207; font-weight:700; padding:1px 7px; border-radius:10px; font-size:.86rem; }
 
     /* Header */
     #topbar { height:56px; background:#fff; border-bottom:1px solid #e2e8f0;
@@ -94,7 +94,7 @@
 
     /* Status strip */
     #status-strip { padding:.5rem 1rem; display:flex; gap:1.5rem; align-items:center;
-                    border-radius:.5rem; margin-bottom:1rem; font-size:.82rem; }
+                    border-radius:.5rem; margin-bottom:1rem; font-size:.92rem; }
     #status-strip.stable   { background:#f0fdf4; border:1px solid #bbf7d0; color:#15803d; }
     #status-strip.unstable { background:#fef2f2; border:1px solid #fecaca; color:#dc2626; }
 
@@ -103,16 +103,16 @@
 
     /* Memorial */
     .mem-section { margin-bottom:1.5rem; }
-    .mem-section-title { font-size:.85rem; font-weight:700; color:#1d4ed8; margin-bottom:.75rem;
+    .mem-section-title { font-size:.95rem; font-weight:700; color:#1d4ed8; margin-bottom:.75rem;
                          border-bottom:2px solid #eff6ff; padding-bottom:.4rem; }
-    .mem-step { font-size:.8rem; margin-bottom:.75rem; padding:.5rem .75rem;
+    .mem-step { font-size:.9rem; margin-bottom:.75rem; padding:.5rem .75rem;
                 background:#f8fafc; border-radius:.375rem; border-left:3px solid #cbd5e1; }
-    .mem-step .label  { color:#64748b; font-size:.75rem; margin-bottom:.3rem; font-weight:600; }
+    .mem-step .label  { color:#64748b; font-size:.85rem; margin-bottom:.3rem; font-weight:600; }
     .mem-step .mem-formula { background:#eff6ff; border-radius:4px; padding:4px 8px;
-                             font-family:monospace; font-size:.78rem; color:#1e40af; margin:3px 0; }
+                             font-family:monospace; font-size:.87rem; color:#1e40af; margin:3px 0; }
     .mem-step .mem-subst   { background:#f0fdf4; border-radius:4px; padding:4px 8px;
-                             font-family:monospace; font-size:.78rem; color:#166534; margin:3px 0; }
-    .mem-step .result { color:#15803d; font-weight:700; margin-top:.3rem; font-size:.8rem; }
+                             font-family:monospace; font-size:.87rem; color:#166534; margin:3px 0; }
+    .mem-step .result { color:#15803d; font-weight:700; margin-top:.3rem; font-size:.9rem; }
 
     /* Responsive */
     @media (max-width:900px) {
@@ -127,7 +127,7 @@
     @keyframes spin { to { transform:rotate(360deg); } }
 
     /* Notice */
-    .notice { padding:.6rem .9rem; border-radius:.5rem; font-size:.82rem; }
+    .notice { padding:.6rem .9rem; border-radius:.5rem; font-size:.9rem; }
     .notice-info { background:#eff6ff; border:1px solid #bfdbfe; color:#1d4ed8; }
     .notice-warn { background:#fffbeb; border:1px solid #fde68a; color:#92400e; }
 
@@ -185,6 +185,86 @@
 
     <div class="wizard-step active card" id="wz-step-1">
       <div class="card-title">📐 Geometria do Muro</div>
+
+      <!-- Section diagram -->
+      <svg viewBox="0 0 360 362" style="width:100%;max-width:360px;display:block;margin:0 auto 1.25rem;border-radius:8px;border:1px solid #e2e8f0;background:#f8fafc;" aria-label="Seção típica do muro de contenção">
+        <defs>
+          <pattern id="hatS" width="8" height="8" patternUnits="userSpaceOnUse" patternTransform="rotate(45)">
+            <line x1="0" y1="0" x2="0" y2="8" stroke="#92400e" stroke-width="1.5" opacity="0.38"/>
+          </pattern>
+        </defs>
+        <!-- Retained soil (aterro) -->
+        <polygon points="118,30 230,30 230,270 126,270" fill="#e8d5b0" opacity="0.55"/>
+        <polygon points="118,30 230,30 230,270 126,270" fill="url(#hatS)"/>
+        <!-- Passive soil (front, depth D) -->
+        <rect x="70" y="238" width="28" height="60" fill="#e8d5b0" opacity="0.45"/>
+        <rect x="70" y="238" width="28" height="60" fill="url(#hatS)"/>
+        <!-- Subsoil -->
+        <rect x="70" y="298" width="160" height="28" fill="#d4b896" opacity="0.3"/>
+        <rect x="70" y="298" width="160" height="28" fill="url(#hatS)"/>
+        <!-- Foundation concrete -->
+        <rect x="70" y="270" width="160" height="28" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
+        <!-- Stem concrete (trapezoid: front face vertical, back tapered) -->
+        <polygon points="98,30 118,30 126,270 98,270" fill="#94a3b8" stroke="#475569" stroke-width="1.5"/>
+        <!-- Front ground level (dashed) -->
+        <line x1="36" y1="238" x2="98" y2="238" stroke="#374151" stroke-width="1.2" stroke-dasharray="5,3"/>
+        <!-- Back/aterro ground level -->
+        <line x1="118" y1="30" x2="230" y2="30" stroke="#374151" stroke-width="0.9" stroke-dasharray="4,3" opacity="0.45"/>
+
+        <!-- == DIMENSION LINES == -->
+        <!-- H2: x=49, from y=30 to y=270 (blue) -->
+        <line x1="49" y1="30" x2="49" y2="270" stroke="#2563eb" stroke-width="1.2"/>
+        <line x1="45" y1="30"  x2="53" y2="30"  stroke="#2563eb" stroke-width="1.2"/>
+        <line x1="45" y1="270" x2="53" y2="270" stroke="#2563eb" stroke-width="1.2"/>
+        <text x="38" y="153" font-size="12" fill="#1d4ed8" font-weight="700" text-anchor="middle">H₂</text>
+
+        <!-- D: x=63, from y=238 to y=298 (purple) -->
+        <line x1="63" y1="238" x2="63" y2="298" stroke="#7c3aed" stroke-width="1.2"/>
+        <line x1="59" y1="238" x2="67" y2="238" stroke="#7c3aed" stroke-width="1.2"/>
+        <line x1="59" y1="298" x2="67" y2="298" stroke="#7c3aed" stroke-width="1.2"/>
+        <text x="52" y="272" font-size="12" fill="#6d28d9" font-weight="700" text-anchor="middle">D</text>
+
+        <!-- t2: above stem top at y=17 (red) -->
+        <line x1="98"  y1="17" x2="118" y2="17" stroke="#dc2626" stroke-width="1.2"/>
+        <line x1="98"  y1="13" x2="98"  y2="21" stroke="#dc2626" stroke-width="1.2"/>
+        <line x1="118" y1="13" x2="118" y2="21" stroke="#dc2626" stroke-width="1.2"/>
+        <text x="108" y="11" font-size="10" fill="#dc2626" font-weight="700" text-anchor="middle">t₂</text>
+
+        <!-- tf: right bracket at x=243 (red) -->
+        <line x1="243" y1="270" x2="243" y2="298" stroke="#dc2626" stroke-width="1.2"/>
+        <line x1="239" y1="270" x2="247" y2="270" stroke="#dc2626" stroke-width="1.2"/>
+        <line x1="239" y1="298" x2="247" y2="298" stroke="#dc2626" stroke-width="1.2"/>
+        <text x="252" y="286" font-size="10" fill="#dc2626" font-weight="700" text-anchor="start">tf</text>
+
+        <!-- t3, t1, t4 at y=314 (orange) -->
+        <line x1="70"  y1="314" x2="230" y2="314" stroke="#ea580c" stroke-width="0.8" opacity="0.4"/>
+        <line x1="70"  y1="314" x2="98"  y2="314" stroke="#ea580c" stroke-width="1.2"/>
+        <line x1="70"  y1="310" x2="70"  y2="318" stroke="#ea580c" stroke-width="1.2"/>
+        <line x1="98"  y1="310" x2="98"  y2="318" stroke="#ea580c" stroke-width="1.2"/>
+        <text x="84" y="329" font-size="10" fill="#c2410c" font-weight="700" text-anchor="middle">t₃</text>
+
+        <line x1="98"  y1="314" x2="126" y2="314" stroke="#ea580c" stroke-width="1.2"/>
+        <line x1="126" y1="310" x2="126" y2="318" stroke="#ea580c" stroke-width="1.2"/>
+        <text x="112" y="329" font-size="10" fill="#c2410c" font-weight="700" text-anchor="middle">t₁</text>
+
+        <line x1="126" y1="314" x2="230" y2="314" stroke="#ea580c" stroke-width="1.2"/>
+        <line x1="230" y1="310" x2="230" y2="318" stroke="#ea580c" stroke-width="1.2"/>
+        <text x="178" y="329" font-size="10" fill="#c2410c" font-weight="700" text-anchor="middle">t₄ (auto)</text>
+
+        <!-- B at y=343 (blue) -->
+        <line x1="70"  y1="343" x2="230" y2="343" stroke="#2563eb" stroke-width="1.2"/>
+        <line x1="70"  y1="339" x2="70"  y2="347" stroke="#2563eb" stroke-width="1.2"/>
+        <line x1="230" y1="339" x2="230" y2="347" stroke="#2563eb" stroke-width="1.2"/>
+        <text x="150" y="357" font-size="12" fill="#1d4ed8" font-weight="700" text-anchor="middle">B</text>
+
+        <!-- Labels inside shapes -->
+        <text x="112" y="155" font-size="9" fill="#e2e8f0" text-anchor="middle" font-weight="600">cortina</text>
+        <text x="150" y="287" font-size="9" fill="#e2e8f0" text-anchor="middle" font-weight="600">fundação</text>
+        <text x="182" y="155" font-size="9" fill="#78350f" text-anchor="middle" font-style="italic">aterro</text>
+        <text x="84"  y="258" font-size="8" fill="#475569" text-anchor="middle">ponta</text>
+        <text x="178" y="258" font-size="8" fill="#475569" text-anchor="middle">calcanhar</text>
+      </svg>
+
       <div class="sec-group">
         <div><label>H₂ — Altura da cortina (m)</label><input class="inp" id="H2" type="number" step="0.1" value="6.0"></div>
         <div><label>B — Largura da base (m)</label><input class="inp" id="B" type="number" step="0.1" value="4.0"></div>
